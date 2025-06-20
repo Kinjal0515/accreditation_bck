@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\DashboardController;
 
@@ -15,7 +15,7 @@ use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WhatsappConfigurationsController;
-
+use App\Http\Controllers\ZoneController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -57,7 +57,6 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::get('/payment-log', [DashboardController::class, 'getPaymentLog']);
         Route::delete('/flush-payment-log', [DashboardController::class, 'PaymentLogDelet']);
 
-        // Route::get('/getAllData/{id}', [DashboardController::class, 'getAllData']);
 
         Route::post('/create-role', [RolePermissionController::class, 'createRole']);
         Route::get('/role-list', [RolePermissionController::class, 'getRoles']);
@@ -82,6 +81,8 @@ Route::middleware(['restrict.ip'])->group(function () {
 
         //user route
         Route::get('users', [UserController::class, 'index']);
+        Route::post('user-approval/{id}', [UserController::class, 'approvalUrl']);
+        Route::get('fatch-company/{org_id}', [UserController::class, 'fatchCompany']);
         Route::get('users/list', [UserController::class, 'indexlist']);
         Route::get('users-by-role/{role}', [UserController::class, 'getUsersByRole']);
         Route::delete('user-delete/{id}', [UserController::class, 'destroy']);
@@ -122,9 +123,6 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::get('email-config', [MailController::class, 'index']);
         Route::post('email-config', [MailController::class, 'store']);
 
-
-
-
         //SMS
         Route::get('/sms-api/{id}', [SmsController::class, 'index']);
         Route::post('/store-api', [SmsController::class, 'DefaultApi']);
@@ -132,6 +130,22 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('/sms-template/{id}', [SmsController::class, 'store']);
         Route::post('/sms-template-update/{id}', [SmsController::class, 'update']);
         Route::post('/send-sms', [SmsController::class, 'sendSms']);
+
+        //CategoryController
+        Route::get('/category-list/{user_id}', [CategoryController::class, 'index']);
+        Route::get('/category', [CategoryController::class, 'listData']);
+        Route::post('/category-store', [CategoryController::class, 'store']);
+        Route::post('/category-update/{id}', [CategoryController::class, 'update']);
+        Route::get('/category-show/{id}', [CategoryController::class, 'show']);
+        Route::delete('/category-destroy/{id}', [CategoryController::class, 'destroy']);
+
+        //ZoneController
+        Route::get('/zone-list/{user_id}', [ZoneController::class, 'index']);
+        Route::get('/zone', [ZoneController::class, 'listData']);
+        Route::post('/zone-store', [ZoneController::class, 'store']);
+        Route::post('/zone-update/{id}', [ZoneController::class, 'update']);
+        Route::get('/zone-show/{id}', [ZoneController::class, 'show']);
+        Route::delete('/zone-destroy/{id}', [ZoneController::class, 'destroy']);
     });
 
 

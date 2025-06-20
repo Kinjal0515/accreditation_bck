@@ -40,7 +40,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(User::class, 'reporting_user');
     }
-   
+    public function Company()
+    {
+        return $this->belongsTo(Company::class, 'user_id');
+    }
 
 
 }

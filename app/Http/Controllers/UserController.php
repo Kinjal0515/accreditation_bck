@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Exports\UserExport;
 use App\Models\AgentEvent;
+use App\Models\Company;
 use App\Models\Event;
+use App\Models\Organizer;
 use App\Models\ScannerGate;
 use App\Models\Shop;
 use App\Models\Ticket;
@@ -42,14 +44,13 @@ class UserController extends Controller
                 ->whereIn('id', $userIds)
                 ->latest()
                 ->get();
-           
-        }else{
-             $users = User::with(['roles', 'reportingUser'])
+        } else {
+            $users = User::with(['roles', 'reportingUser'])
                 ->where('reporting_user', $loggedInUser->id)
                 ->latest()->get();
         }
-   
-           
+
+
         $allUsers = $users->map(function ($user) {
             return [
                 'id' => $user->id,
@@ -105,24 +106,24 @@ class UserController extends Controller
         $eventType = $request->type;
 
         // Determine date range
-        if ($eventType === 'all') {
-            $startDate = null;
-            $endDate = null;
-        } elseif ($request->has('date')) {
-            $dates = explode(',', $request->date);
-            if (count($dates) === 1 || ($dates[0] === $dates[1])) {
-                $startDate = Carbon::parse($dates[0])->startOfDay();
-                $endDate = Carbon::parse($dates[0])->endOfDay();
-            } elseif (count($dates) === 2) {
-                $startDate = Carbon::parse($dates[0])->startOfDay();
-                $endDate = Carbon::parse($dates[1])->endOfDay();
-            } else {
-                return response()->json(['status' => false, 'message' => 'Invalid date format'], 400);
-            }
-        } else {
-            $startDate = Carbon::today()->startOfDay();
-            $endDate = Carbon::today()->endOfDay();
-        }
+        // if ($eventType === 'all') {
+        //     $startDate = null;
+        //     $endDate = null;
+        // } elseif ($request->has('date')) {
+        //     $dates = explode(',', $request->date);
+        //     if (count($dates) === 1 || ($dates[0] === $dates[1])) {
+        //         $startDate = Carbon::parse($dates[0])->startOfDay();
+        //         $endDate = Carbon::parse($dates[0])->endOfDay();
+        //     } elseif (count($dates) === 2) {
+        //         $startDate = Carbon::parse($dates[0])->startOfDay();
+        //         $endDate = Carbon::parse($dates[1])->endOfDay();
+        //     } else {
+        //         return response()->json(['status' => false, 'message' => 'Invalid date format'], 400);
+        //     }
+        // } else {
+        //     $startDate = Carbon::today()->startOfDay();
+        //     $endDate = Carbon::today()->endOfDay();
+        // }
 
         // Base query
         if ($loggedInUser->hasRole('Admin')) {
@@ -133,9 +134,9 @@ class UserController extends Controller
         }
 
         // Apply date filter only if not "all"
-        if ($eventType !== 'all' && $startDate && $endDate) {
-            $query->whereBetween('created_at', [$startDate, $endDate]);
-        }
+        // if ($eventType !== 'all' && $startDate && $endDate) {
+        //     $query->whereBetween('created_at', [$startDate, $endDate]);
+        // }
 
         $users = $query->latest()->get();
 
@@ -146,7 +147,7 @@ class UserController extends Controller
                 'contact' => $user->number,
                 'email' => $user->email,
                 'role_name' => $user->roles->pluck('name')->first(),
-                'status' => $user->staus,
+                'status' => $user->status,
                 'reporting_user' => $user->reportingUser ? $user->reportingUser->name : null,
                 'organisation' => $user->organisation,
                 'created_at' => $user->created_at,
@@ -181,85 +182,7 @@ class UserController extends Controller
     }
 
 
-    // public function index(Request $request)
-    // {
-    //     $loggedInUser = Auth::user();
 
-    //     // Date Filter
-    //     if ($request->has('date')) {
-    //         $dates = explode(',', $request->date);
-    //         if (count($dates) === 1 || ($dates[0] === $dates[1])) {
-    //             // Single date
-    //             $startDate = Carbon::parse($dates[0])->startOfDay();
-    //             $endDate = Carbon::parse($dates[0])->endOfDay();
-    //         } elseif (count($dates) === 2) {
-    //             // Date range
-    //             $startDate = Carbon::parse($dates[0])->startOfDay();
-    //             $endDate = Carbon::parse($dates[1])->endOfDay();
-    //         } else {
-    //             return response()->json(['status' => false, 'message' => 'Invalid date format'], 400);
-    //         }
-    //     } else {
-    //         // Default: Today's records
-    //         $startDate = Carbon::today()->startOfDay();
-    //         $endDate = Carbon::today()->endOfDay();
-    //     }
-
-    //     // Get users based on role and created_at filter
-    //     if ($loggedInUser->hasRole('Admin')) {
-    //         $users = User::with(['roles', 'reportingUser'])
-    //             ->whereBetween('created_at', [$startDate, $endDate])
-    //             ->latest()->get();
-    //     } else {
-    //         $users = User::with(['roles', 'reportingUser'])
-    //             ->where('reporting_user', $loggedInUser->id)
-    //             ->whereBetween('created_at', [$startDate, $endDate])
-    //             ->latest()->get();
-    //     }
-
-    //     // All detailed users
-    //     $allUsers = $users->map(function ($user) {
-    //         return [
-    //             'id' => $user->id,
-    //             'name' => $user->name,
-    //             'contact' => $user->number,
-    //             'email' => $user->email,
-    //             'role_name' => $user->roles->pluck('name')->first(),
-    //             'status' => $user->staus,
-    //             'reporting_user' => $user->reportingUser ? $user->reportingUser->name : null,
-    //             'organisation' => $user->organisation ?? null,
-    //             'created_at' => $user->created_at,
-    //             'authentication' => $user->authentication,
-    //         ];
-    //     });
-
-    //     // Users formatted for dropdowns, etc.
-    //     $formattedUsers = $users->map(function ($user) {
-    //         return [
-    //             'value' => $user->id,
-    //             'label' => $user->name,
-    //             'number' => $user->number,
-    //             'email' => $user->email,
-    //             'role_name' => $user->roles->pluck('name')->first(),
-    //         ];
-    //     });
-
-    //     // Organizers list
-    //     $organizers = User::role('Organizer')->get();
-    //     $org = $organizers->map(function ($user) {
-    //         return [
-    //             'value' => $user->id,
-    //             'label' => $user->name,
-    //         ];
-    //     });
-
-    //     return response()->json([
-    //         'status' => true,
-    //         'users' => $formattedUsers,
-    //         'allData' => $allUsers,
-    //         'organizers' => $org
-    //     ]);
-    // }
 
     public function create(Request $request)
     {
@@ -292,57 +215,54 @@ class UserController extends Controller
             $user->name = $request->name;
             $user->email = $request->email ?? $request->number . '@gyt.co.in';
             $user->number = $request->number;
+            $user->comp_id = $request->comp_id;
+            $user->org_id = $request->org_id;
             // $user->company_name = $request->company_name;
             // $user->designation = $request->designation;
-            // $user->address = $request->address;
+            $user->address = $request->address;
             // $user->organisation = $request->organisation;
             // $user->alt_number = $request->alt_number;
-            // $user->pincode = $request->pincode;
-            // $user->state = $request->state;
-            // $user->city = $request->city;
+            $user->pincode = $request->pincode;
+            $user->state = $request->state;
+            $user->city = $request->city;
             // $user->bank_name = $request->bank_name;
             // $user->bank_number = $request->bank_number;
             // $user->bank_ifsc = $request->bank_ifsc;
             // $user->bank_branch = $request->bank_branch;
             // $user->bank_micr = $request->bank_micr;
             // $user->tax_number = $request->tax_number;
-            // $user->reporting_user = $request->reporting_user;
-            // $user->authentication = $request->authentication;
+            $user->reporting_user = $request->reporting_user;
+            $user->authentication = $request->authentication ? 1 : 0;
             // $user->agent_disc = $request->agent_disc;
             $user->status = true;
+            $user->approval_status = 0;
             $user->password = Hash::make($request->password);
 
-            // if ($request->hasFile('photo')) {
-            //     $file = $request->file('photo');
-            //     if ($file->isValid()) {
-            //         $folder = 'profile/' . str_replace(' ', '_', $request->name);
-            //         $filePath = $this->storeFile($file, $folder); // uses your storeFile method
-            //         $user->photo = $filePath;
-            //     }
-            // }
-            // if ($request->hasFile('doc')) {
-            //     $file = $request->file('doc');
-            //     if ($file->isValid()) {
-            //         $folder = 'document/' . str_replace(' ', '_', $request->name);
-            //         $filePath = $this->storeFile($file, $folder); // uses your storeFile method
-            //         $user->doc = $filePath;
-            //     }
-            // }
+            if ($request->hasFile('photo')) {
+                $file = $request->file('photo');
+                if ($file->isValid()) {
+                    $folder = 'photo/' . str_replace(' ', '_', $request->name);
+                    $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                    $user->photo = $filePath;
+                }
+            }
+            if ($request->hasFile('photoId')) {
+                $file = $request->file('photoId');
+                if ($file->isValid()) {
+                    $folder = 'photoId/' . str_replace(' ', '_', $request->name);
+                    $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                    $user->photo_id = $filePath;
+                }
+            }
 
             $user->save();
             $userId = $user->id;
             $this->updateUserRole($request, $user);
-            if ($request->role_name == 'Shop Keeper') {
-                $this->shopStore($request, $userId);
+            if ($request->role_name == 'Organizer') {
+                $this->OrganizerStore($request, $userId);
             }
-            if ($request->role_name == 'Agent') {
-                $this->agentEventStore($request, $userId);
-            }
-            if ($request->role_name == 'Scanner') {
-                $this->scannerGateStore($request, $userId);
-            }
-            if ($request->role_name == 'Accreditation') {
-                $this->userTicketStore($request, $userId);
+            if ($request->role_name == 'Company') {
+                $this->CompanyStore($request, $userId);
             }
 
             return response()->json(['status' => true, 'message' => 'User Created Successfully', 'user' => $user], 201);
@@ -374,83 +294,31 @@ class UserController extends Controller
         $allUser = User::all();
         $roles = Role::all();
 
-        $user = User::with(['reportingUser', 'shop'])->where('id', $id)->first();
+        $user = User::with(['reportingUser','Company'])->where('id', $id)->first();
         // return response()->json($user);
         $userWithReportingUserNames = [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'phone_number' => $user->number,
-            'organisation' => $user->organisation,
-            'alt_number' => $user->alt_number,
+            'number' => $user->number,
+            'address' => $user->address,
             'pincode' => $user->pincode,
             'state' => $user->state,
-            'city' => $user->city,
-            'bank_name' => $user->bank_name,
-            'bank_number' => $user->bank_number,
-            'bank_ifsc' => $user->bank_ifsc,
-            'bank_branch' => $user->bank_branch,
-            'bank_micr' => $user->bank_micr,
-            'two_fector_auth' => $user->two_fector_auth,
-            'ip_auth' => $user->ip_auth,
-            'ip_addresses' => $user->ip_addresses,
+            'city' => $user->city,            
             'status' => $user->status,
-            'role' => $user->roles->first(),
-            'email_alert' => $user->email_alerts,
-            'whatsapp_alert' => $user->whatsapp_alerts,
-            'sms_alert' => $user->text_alerts,
+            'photo' => $user->photo,
+            'photo_id' => $user->photo_id,
+            'org_id' => $user->org_id,
+            'comp_id' => $user->comp_id,
+            'role' => $user->roles->first(),           
             'reporting_user_id' => $user->reportingUser ? $user->reportingUser->id : null,
             'shop' => $user->shop ? $user->shop : null,
             'reporting_user' => $user->reportingUser ? $user->reportingUser->name : 'Admin User',
-            'qr_length' => $user->qr_length,
             'authentication' => $user->authentication,
-            'agent_disc' => $user->agent_disc,
         ];
-        $eventDataagent = AgentEvent::where('user_id', $id)->first();
-        // return response()->json($eventDataagent);
-        if ($eventDataagent) {
-            // Event ID JSON decode
-            $eventIds = json_decode($eventDataagent->event_id, true);
 
-            // Event table mathi details fetch kariye
-            //  $events = Event::whereIn('id', $eventIds)->get();
 
-            $events = Event::with(['tickets' => function ($query) {
-                $query->select('id', 'event_id', 'name');
-            }])
-                ->whereIn('id', $eventIds)
-                ->select('id', 'name')
-                ->get();
-
-            // Attach full events detail
-            $userWithReportingUserNames['events'] = $events;
-        } else {
-            $userWithReportingUserNames['events'] = [];
-        }
-
-        $userTickets = UserTicket::where('user_id', $id)->get();
-        $formattedTickets = [];
-        foreach ($userTickets as $userTicket) {
-            $ticketIds = $userTicket->ticket_id;
-
-            // If it's an array (because it's cast as array in the model)
-            if (is_array($ticketIds)) {
-                foreach ($ticketIds as $ticketId) {
-                    $ticket = \App\Models\Ticket::select('id', 'name', 'event_id')->find($ticketId);
-                    if ($ticket) {
-                        $formattedTickets[] = [
-                            'value' => $ticket->id,
-                            'label' => $ticket->name,
-                            'eventId' => $ticket->event_id,
-                        ];
-                    }
-                }
-            }
-        }
-
-        $userWithReportingUserNames['tickets'] = $formattedTickets;
-
-        return response()->json(['status' => true, 'user' => $userWithReportingUserNames, 'allUser' => $allUser, 'roles' => $roles]);
+        return response()->json(['status' => true, 'user' => $userWithReportingUserNames,  'roles' => $roles]);
     }
 
     public function update(Request $request, string $id)
@@ -484,7 +352,7 @@ class UserController extends Controller
             }
 
             if ($request->has('reporting_user')) {
-                $user->reporting_user = $request->reporting_user;
+                $user->reporting_user = $request->reporting_user ? 1 : 0;
             }
 
             if ($request->has('organisation')) {
@@ -544,7 +412,16 @@ class UserController extends Controller
             if ($request->has('status')) {
                 $user->status = $request->status;
             }
+            if ($request->has('approval_status')) {
+                $user->approval_status = $request->approval_status;
+            }
 
+            if ($request->has('zone')) {
+                $zones = is_array($request->zone) ? $request->zone : json_decode($request->zone, true);
+                $user->zone = json_encode($zones);
+            }
+            
+            
             if ($request->hasFile('photo')) {
                 $file = $request->file('photo');
                 if ($file->isValid()) {
@@ -573,14 +450,12 @@ class UserController extends Controller
                     $user->assignRole($role);
                 }
             }
-            if ($request->role_name == 'Shop Keeper') {
-                $this->shopUpdate($request, $id);
+            if ($request->role_name == 'Organizer') {
+                $this->OrganizerStore($request, $id);
             }
-            if ($request->role_name == 'Agent' || $request->role_name == 'Sponsor' || $request->role_name == 'Accreditation') {
-                $this->agentEventStore($request, $id);
-            }
-            if ($request->role_name == 'Accreditation') {
-                $this->userTicketStore($request, $id);
+
+            if ($request->role_name == 'Company') {
+                $this->CompanyStore($request, $id);
             }
 
             // $role = Role::where('id', $request->role_id)->first();
@@ -623,79 +498,7 @@ class UserController extends Controller
         }
     }
 
-    // public function checkEmail(Request $request)
-    // {
-    //     $email = $request->input('email');
-    //     $mobile = $request->input('number');
-
-    //     $user = User::where('email', $email)
-    //         ->orWhere('number', $mobile)
-    //         ->first();
-    //         // return response()->json([
-    //         //     'exists' => $user,
-    //         //     // 'message' => 'Both email and mobile are available'
-    //         // ]);
-
-    //     if ($user) {
-    //         $emailExists = $user->email == $email;
-    //         $mobileExists = $user->number == $mobile;
-
-    //         return response()->json([
-    //             'exists' => true,
-    //             'message' => 'User exists',
-    //             'email_exists' => $emailExists,
-    //             'mobile_exists' => $mobileExists,
-    //             'user' => $user
-    //         ]);
-    //     } else {
-    //         return response()->json([
-    //             'exists' => false,
-    //             'message' => 'Both email and mobile are available'
-    //         ]);
-    //     }
-    // }
-
-    // public function checkEmail(Request $request)
-    // {
-    //     $emailExists = false;
-    //     $mobileExists = false;
-    //     $email = $request->input('email');
-    //     $mobile = $request->input('number');
-
-    //     $query = User::query();
-
-    //     if ($mobile) {
-    //         $query->orWhere('number', $mobile);
-    //     }
-
-    //     if ($email) {
-    //         $query->orWhere('email', $email);
-    //     }
-
-    //     $user = $query->first();
-    //     if ($user) {
-    //         if ($email) {
-    //             $emailExists = $user->email == $email;
-    //         }
-    //         if ($mobile) {
-    //             $mobileExists = $user->number == $mobile;
-    //         }
-    //         return response()->json([
-    //             'exists' => true,
-    //             'message' => 'User exists',
-    //             'email_exists' => $emailExists,
-    //             'mobile_exists' => $mobileExists,
-    //             'user' => $user
-    //         ]);
-    //     } else {
-    //         return response()->json([
-    //             'exists' => false,
-    //             'message' => 'Both email and mobile are available'
-    //         ]);
-    //     }
-    // }
-
-
+   
     public function checkEmail(Request $request)
     {
         $emailExists = false;
@@ -704,7 +507,7 @@ class UserController extends Controller
         $mobile = $request->input('number');
 
         // Start by checking if both email and mobile are provided
-        $query = User::query()->select('id', 'name', 'email', 'number', 'photo','doc','company_name','designation');
+        $query = User::query()->select('id', 'name', 'email', 'number', 'photo', 'doc', 'company_name', 'designation');
 
         if ($mobile) {
             $query->orWhere('number', $mobile);
@@ -883,45 +686,13 @@ class UserController extends Controller
         return response()->json(['user' => $result]);
     }
 
-    public function export(Request $request)
-    {
-        $role = $request->input('role');
-        $status = $request->input('status');
-        $dates = $request->input('date') ? explode(',', $request->input('date')) : null;
-
-        $query = User::query();
-
-        if ($role) {
-            $query->whereHas('roles', function ($query) use ($role) {
-                $query->where('name', $role);
-            });
-        }
-
-        if ($request->has('status')) {
-            $query->where('status', $status);
-        }
-
-        if ($dates) {
-            if (count($dates) === 1) {
-                $singleDate = Carbon::parse($dates[0])->toDateString();
-                $query->whereDate('created_at', $singleDate);
-            } elseif (count($dates) === 2) {
-                $startDate = Carbon::parse($dates[0])->startOfDay();
-                $endDate = Carbon::parse($dates[1])->endOfDay();
-                $query->whereBetween('created_at', [$startDate, $endDate]);
-            }
-        }
-
-        $users = $query->get();
-        // return response()->json(['user' => $users]);
-        return Excel::download(new UserExport($users), 'users_export.xlsx');
-    }
 
     public function getUsersByRole($role)
     {
+      
         if ($role === 'Organizer') {
             $users = Role::where('name', 'Admin')->first()->users()->whereNull('deleted_at')->get();
-        } elseif ($role === 'Agent' || $role === 'POS' || $role === 'Scanner') {
+        } elseif ($role === 'User' || $role === 'Company' || $role === 'Scanner') {
             $users = Role::where('name', 'Organizer')->first()->users()->whereNull('deleted_at')->get();
         } else {
             return response()->json(['error' => 'Invalid role'], 400);
@@ -931,7 +702,6 @@ class UserController extends Controller
             return [
                 'value' => $user->id,
                 'label' => $user->name,
-                'organisation' => $user?->organisation,
             ];
         });
 
@@ -989,82 +759,85 @@ class UserController extends Controller
         }
     }
 
-    private function shopStore($request, $userId)
+    private function OrganizerStore($request, $userId)
     {
         try {
 
-            $shopData = new Shop();
-            $shopData->user_id = $userId;
-            $shopData->shop_name = $request->shop_name;
-            $shopData->shop_no = $request->shop_no;
-            $shopData->gst_no = $request->gst_no;
+            $organizerData = new Organizer();
+            $organizerData->user_id = $userId;
+            $organizerData->name = $request->name;
+            $organizerData->email = $request->email;
+            $organizerData->number = $request->number;
+            $organizerData->address = $request->address;
+            $organizerData->gst_no = $request->gst_no;
+            $organizerData->company_name = $request->company_name;
 
-            $shopData->save();
-            return response()->json(['status' => true, 'message' => 'shopData craete successfully', 'shopData' => $shopData,], 200);
+            if ($request->hasFile('photo')) {
+                $file = $request->file('photo');
+                if ($file->isValid()) {
+                    $folder = 'profile/' . str_replace(' ', '_', $request->name);
+                    $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                    $organizerData->photo = $filePath;
+                }
+            }
+            if ($request->hasFile('doc')) {
+                $file = $request->file('doc');
+                if ($file->isValid()) {
+                    $folder = 'document/' . str_replace(' ', '_', $request->name);
+                    $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                    $organizerData->doc = $filePath;
+                }
+            }
+
+            $organizerData->save();
+            return response()->json(['status' => true, 'message' => 'organizerData craete successfully', 'data' => $organizerData,], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => 'Failed to shopData '], 404);
+            return response()->json(['status' => false, 'message' => 'Failed to organizerData '], 404);
         }
     }
 
 
-    private function shopUpdate($request, $id)
+    private function CompanyStore($request, $userId)
     {
         try {
-            $shopData = Shop::where('user_id', $id)->firstOrFail();
+            $filePath = null;
 
-            if ($request->has('shop_name')) {
-                $shopData->shop_name = $request->shop_name;
+            if ($request->hasFile('companyLetter')) {
+                $file = $request->file('companyLetter');
+                if ($file->isValid()) {
+                    $folder = 'company_letter/' . str_replace(' ', '_', $request->name);
+                    $filePath = $this->storeFile($file, $folder);
+                }
             }
 
-            if ($request->has('shop_no')) {
-                $shopData->shop_no = $request->shop_no;
-            }
-
-            if ($request->has('gst_no')) {
-                $shopData->gst_no = $request->gst_no;
-            }
-
-            $shopData->save();
-            return $shopData;
-            // return response()->json(['status' => true, 'message' => 'shopData update successfully', 'shopData' => $shopData,], 200);
-        } catch (\Exception $e) {
-            \Log::error('Error updating shop: ' . $e->getMessage());
+            $created = Company::updateOrCreate(
+                [
+                    'company_name' => $request->organisation,
+                    'org_id'       => $request->org_id,
+                ],
+                [
+                    'user_id'       => $userId,
+                    'name'          => $request->name,
+                    'number'        => $request->number,
+                    'email'         => $request->email,
+                    'address'       => $request->address,
+                    'gst_no'        => $request->gst_no,
+                    'category_id'   => $request->category_id,
+                    'company_letter'=> $filePath,
+                ]
+            );
 
             return response()->json([
+                'status' => true,
+                'message' => 'Company created successfully',
+                'data' => $created,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
                 'status' => false,
-                'message' => 'Failed to update shop data',
+                'message' => 'Failed to create/update company',
                 'error' => $e->getMessage()
             ], 500);
-        }
-    }
-
-    private function agentEventStore($request, $userId)
-    {
-        try {
-
-            $created = AgentEvent::updateOrCreate(
-                ['user_id' => $userId], // condition to check existing
-                ['event_id' => json_encode($request->events) ?? []] // data to update or insert
-            );
-
-            return response()->json(['status' => true, 'message' => 'AgentEvent craete successfully',  'AgentEvents' => $created,], 200);
-        } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => 'Failed to AgentEvent '], 200);
-        }
-    }
-
-    private function scannerGateStore($request, $userId)
-    {
-        try {
-
-            $created = ScannerGate::updateOrCreate(
-                ['user_id' => $userId], // condition to check existing
-                ['gate_id' => json_encode($request->gates) ?? []] // data to update or insert
-            );
-
-            return response()->json(['status' => true, 'message' => 'ScannerGate craete successfully',  'ScannerGate' => $created,], 200);
-        } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => 'Failed to ScannerGate '], 200);
         }
     }
 
@@ -1109,45 +882,60 @@ class UserController extends Controller
             ], 500);
         }
     }
-    private function userTicketStore($request, $userId)
+
+
+    public function approvalUrl(Request $request, $id)
     {
         try {
-            $tickets = $request->tickets;
+            $status = $request->input('status');
 
-            if (!isset($tickets) || !is_array($tickets) || empty($tickets)) {
-                return response()->json(['status' => false, 'message' => 'No tickets provided'], 400);
+            $user = User::find($id);
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User not found.'
+                ], 404);
             }
 
-            $grouped = collect($tickets)->groupBy('eventId');
+            $user->approval_status = $status;
+            $user->save();
 
-            foreach ($grouped as $eventId => $ticketGroup) {
-                $ticketIds = [];
-                foreach ($ticketGroup as $ticket) {
-                    if (isset($ticket['value'])) {
-                        $ticketIds[] = $ticket['value'];
-                    }
-                }
-
-                if (empty($ticketIds)) {
-                    continue;
-                }
-
-                $userTicket = UserTicket::updateOrCreate(
-                    [
-                        'user_id'  => $userId,
-                        'event_id' => $eventId,
-                    ],
-                    [
-                        'ticket_id' => $ticketIds,
-                    ]
-                );
-            }
-
-            return response()->json(['status' => true, 'message' => 'Tickets stored successfully', 'data' => $userTicket], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'User status updated successfully.',
+                'data' => $user
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'Failed to store tickets: ' . $e->getMessage()
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function fatchCompany($org_id)
+    {
+        try {
+            $company = Company::where('org_id', $org_id)->get();
+
+            if (!$company) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Company not found for the given organizer ID.'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $company
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error fetching company.',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
