@@ -14,17 +14,17 @@ use Spatie\Permission\Contracts\Role;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable , HasRoles,SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
 
-   
+
     protected $fillable = ['name', 'email', 'number', 'password', 'status', 'reporting_user'];
- 
+
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
- 
+
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
@@ -40,10 +40,35 @@ class User extends Authenticatable
     {
         return $this->hasMany(User::class, 'reporting_user');
     }
-    public function Company()
+    public function organisation()
     {
-        return $this->belongsTo(Company::class, 'user_id');
+        return $this->belongsTo(Organizer::class, 'id', 'user_id');
+    }
+    public function userOrganisation()
+    {
+        return $this->belongsTo(Organizer::class, 'org_id', 'user_id');
+    }
+    public function userCompany()
+    {
+        return $this->belongsTo(Company::class, 'comp_id');
     }
 
+    public function company()
+    {
+        return $this->belongsTo(Company::class, 'id', 'user_id');
+    }
 
+    public function userCompanyName()
+    {
+        return $this->belongsTo(Company::class, 'reporting_user', 'user_id');
+    }
+
+    public function userOrgName()
+    {
+        return $this->belongsTo(Organizer::class, 'reporting_user', 'user_id');
+    }
+    public function zoneData()
+    {
+        return $this->hasMany(Zone::class);
+    }
 }

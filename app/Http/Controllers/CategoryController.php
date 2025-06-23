@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
@@ -45,6 +46,15 @@ class CategoryController extends Controller
             $categoryData->title = $request->title;
             $categoryData->description = $request->description;
 
+            if ($request->hasFile('background_image')) {
+                $file = $request->file('background_image');
+                if ($file->isValid()) {
+                    $folder = 'background_image/' . str_replace(' ', '_', $request->name);
+                    $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                    $categoryData->background_image = $filePath;
+                }
+            }
+
             $categoryData->save();
             return response()->json(['status' => true, 'message' => 'categoryData craete successfully', 'data' => $categoryData,], 200);
         } catch (\Exception $e) {
@@ -71,6 +81,15 @@ class CategoryController extends Controller
             $categoryData->user_id = $request->user_id;
             $categoryData->title = $request->title;
             $categoryData->description = $request->description;
+            
+            if ($request->hasFile('background_image')) {
+                $file = $request->file('background_image');
+                if ($file->isValid()) {
+                    $folder = 'background_image/' . str_replace(' ', '_', $request->name ?? 'category');
+                    $filePath = $this->storeFile($file, $folder); // your custom file upload method
+                    $categoryData->background_image = $filePath;
+                }
+            }
             $categoryData->save();
 
             return response()->json(['status' => true, 'message' => 'categoryData updated successfully', 'data' => $categoryData], 200);
@@ -89,4 +108,12 @@ class CategoryController extends Controller
         $categoryData->delete();
         return response()->json(['status' => true, 'message' => 'categoryData deleted successfully'], 200);
     }
+
+    private function storeFile($file, $folder, $disk = 'public')
+    {
+        $filename = uniqid() . '_' . $file->getClientOriginalName();
+        $path = $file->storeAs('uploads/' . $folder, $filename, $disk);
+        return Storage::disk($disk)->url($path);
+    }
+
 }
