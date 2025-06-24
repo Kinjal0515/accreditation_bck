@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApprovalHistory;
+use App\Models\Category;
 use App\Models\Company;
 use App\Models\Event;
-use App\Models\Organizer;;
-
+use App\Models\Organizer;
+use App\Models\ScanHistory;
 use App\Models\User;
 use App\Models\UserCard;
 use App\Models\Zone;
@@ -15,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Storage;
@@ -73,20 +75,6 @@ class UserController extends Controller
         return response()->json(['status' => true, 'users' => $formattedUsers, 'allData' => $allUsers, 'organizers' => $org]);
     }
 
-    private function getAllReportingUserIds($organizerId)
-    {
-        $userIds = collect([$organizerId]);
-
-        $children = User::where('reporting_user', $organizerId)->pluck('id');
-
-        foreach ($children as $childId) {
-            $userIds = $userIds->merge($this->getAllReportingUserIds($childId));
-        }
-
-        return $userIds->unique();
-    }
-
-
     public function index(Request $request)
     {
         $loggedInUser = Auth::user();
@@ -113,12 +101,29 @@ class UserController extends Controller
         // }
 
         // Base query
+        // if ($loggedInUser->hasRole('Admin')) {
+        //     $query = User::with(['roles', 'reportingUser']);
+        // } else {
+        //     $query = User::with(['roles', 'reportingUser'])
+        //         ->where('reporting_user', $loggedInUser->id);
+        // }
+
+
         if ($loggedInUser->hasRole('Admin')) {
             $query = User::with(['roles', 'reportingUser']);
+        } elseif ($loggedInUser->hasRole('Organizer')) {
+            $query = User::with(['roles', 'reportingUser'])
+                ->where(function ($q) use ($loggedInUser) {
+                    $q->where('reporting_user', $loggedInUser->id)
+                        ->orWhere('user_org_id', $loggedInUser->id);
+                });
         } else {
             $query = User::with(['roles', 'reportingUser'])
                 ->where('reporting_user', $loggedInUser->id);
         }
+
+
+
 
         // Apply date filter only if not "all"
         // if ($eventType !== 'all' && $startDate && $endDate) {
@@ -143,6 +148,9 @@ class UserController extends Controller
                 'name' => $user->name,
                 'contact' => $user->number,
                 'email' => $user->email,
+                'photo' => $user->photo,
+                'photo_id' => $user->photo_id,
+                'order_id' => $user->order_id,
                 'role_name' => $user->roles->pluck('name')->first(),
                 'status' => $user->status,
                 'approval_status' => $user->approval_status,
@@ -151,10 +159,10 @@ class UserController extends Controller
                 'created_at' => $user->created_at,
                 'authentication' => $user->authentication,
                 'company_name' => $user->userCompany->company_name ?? null,
-                'organiser_name' => $user->userOrganisation->name ?? null,
+                'organiser_name' => $user->reportingUser->name ?? null,
                 'organiser_company_name' => $user->company->company_name ?? null,
                 'user_company_name' => $user->userCompanyName->company_name ?? null,
-                'user_org_name' => $user->userOrgName->name ?? null,
+                // 'user_org_name' => $user->userOrgName->name ?? null,
                 'zoneData' => $zoneData ?? null,
             ];
         });
@@ -185,9 +193,6 @@ class UserController extends Controller
             'organizers' => $org
         ]);
     }
-
-
-
 
     public function create(Request $request)
     {
@@ -222,8 +227,9 @@ class UserController extends Controller
             $user->number = $request->number;
             $user->comp_id = $request->comp_id;
             $user->org_id = $request->org_id;
+            $user->user_org_id = $request->user_org_id;
             // $user->company_name = $request->company_name;
-            // $user->designation = $request->designation;
+            $user->designation = $request->designation;
             $user->address = $request->address;
             // $user->organisation = $request->organisation;
             // $user->alt_number = $request->alt_number;
@@ -324,7 +330,9 @@ class UserController extends Controller
             'email' => $user->email,
             'number' => $user->number,
             'address' => $user->address,
+            'designation' => $user->designation,
             'pincode' => $user->pincode,
+            'user_org_id' => $user->user_org_id,
             'state' => $user->state,
             'zones' => $zoneData, // zone id + name
             'city' => $user->city,
@@ -359,8 +367,6 @@ class UserController extends Controller
         ]);
     }
 
-
-
     public function update(Request $request, string $id)
     {
         try {
@@ -386,6 +392,15 @@ class UserController extends Controller
             }
             if ($request->has('company_name')) {
                 $user->company_name = $request->company_name;
+            }
+            if ($request->has('comp_id')) {
+                $user->comp_id = $request->comp_id;
+            }
+            if ($request->has('user_org_id')) {
+                $user->user_org_id = $request->user_org_id;
+            }
+            if ($request->has('org_id')) {
+                $user->org_id = $request->org_id;
             }
             if ($request->has('designation')) {
                 $user->designation = $request->designation;
@@ -499,7 +514,6 @@ class UserController extends Controller
         }
     }
 
-
     public function checkEmail(Request $request)
     {
         $emailExists = false;
@@ -558,7 +572,6 @@ class UserController extends Controller
         }
     }
 
-
     public function checkMobile(Request $request)
     {
         $mobile = $request->input('number');
@@ -574,7 +587,6 @@ class UserController extends Controller
             return response()->json(['status' => false, 'message' => 'Number not found in the users table.']);
         }
     }
-
 
     public function UpdateUserSecurity(Request $request)
     {
@@ -612,14 +624,6 @@ class UserController extends Controller
         }
     }
 
-    public function CreditLimit(Request $request)
-    {
-        $user = User::firstOrFail($request->id);
-        $user->low_credit_limit = $request->amount;
-        $user->save();
-        return response()->json(['message' => 'Limit Updated Successfully'], 200);
-    }
-
     public function updateAlerts(Request $request, string $id)
     {
         try {
@@ -647,46 +651,6 @@ class UserController extends Controller
             return response()->json(['status' => false, 'message' => 'Failed to update user'], 500);
         }
     }
-
-    public function lowBalanceUser($id)
-    {
-        $users = User::select('id', 'name', 'email', 'whatsapp_number', 'phone_number', 'email_alerts', 'whatsapp_alerts', 'text_alerts')
-            ->with(['balance', 'pricingModel', 'ApiKey'])
-            ->get();
-
-        // Process each user to attach the latest balance and pricing information
-        $filteredUsers = $users->filter(function ($user) {
-            $totalCredits = $user->balance()->latest()->first();
-            $user->latest_balance = optional($totalCredits)->total_credits;
-            $user->pricing = $user->pricingModel()->latest()->first();
-            $user->ApiKey = $user->ApiKey()->latest()->first();
-
-            // Check if the latest balance is lower than the price_alert
-            if ($user->latest_balance < optional($user->pricing)->price_alert) {
-                return true;
-            }
-            return false;
-        });
-        // Remove unnecessary attributes
-        $result = $filteredUsers->map(function ($user) {
-            return [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'whatsapp_number' => $user->whatsapp_number,
-                'phone_number' => $user->phone_number,
-                'latest_balance' => $user->latest_balance,
-                'price_alert' => optional($user->pricing)->price_alert,
-                'ApiKey' => $user->ApiKey->key,
-                'email_alert' => $user->email_alerts,
-                'whatsapp_alert' => $user->whatsapp_alerts,
-                'sms_alert' => $user->text_alerts,
-            ];
-        })->values();
-
-        return response()->json(['user' => $result]);
-    }
-
 
     public function getUsersByRole($role)
     {
@@ -718,46 +682,6 @@ class UserController extends Controller
 
         $userData->delete();
         return response()->json(['status' => true, 'message' => 'user deleted successfully'], 200);
-    }
-
-    public function getQrLength(string $id)
-    {
-        $user = User::where('id', $id)->select('qr_length')->first();
-
-        return response()->json(['status' => true, 'tokenLength' => $user->qr_length, 'message' => 'User Qr Length successfully'], 200);
-    }
-
-    public function createBulkUsers(Request $request)
-    {
-        try {
-            $bulkInsertData = [];
-            $userIds = [];
-            $usersData = $request->users;
-
-            foreach ($usersData as $user) {
-                $bulkInsertData[] = [
-                    'email' => $user['email'],
-                    'number' => $user['number'],
-                    'password' => Hash::make($user['number']), // Default password
-                    'status' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-
-            // Bulk insert and retrieve inserted user IDs
-            User::insert($bulkInsertData);
-            $insertedUsers = User::whereIn('email', array_column($usersData, 'email'))->get();
-
-            // Assign the "User" role in bulk
-            foreach ($insertedUsers as $user) {
-                $user->assignRole('User');
-            }
-
-            return response()->json(['status' => true, 'message' => 'Users Created Successfully'], 201);
-        } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => 'Failed to create users', 'error' => $e->getMessage()], 500);
-        }
     }
 
     private function OrganizerStore($request, $userId)
@@ -801,8 +725,6 @@ class UserController extends Controller
         }
     }
 
-
-
     private function CompanyStore($request, $userId)
     {
         try {
@@ -819,7 +741,7 @@ class UserController extends Controller
             $created = Company::updateOrCreate(
                 [
                     'company_name' => $request->organisation,
-                    'org_id'       => $request->org_id,
+                    'org_id'       => $request->reporting_user,
                 ],
                 [
                     'user_id'       => $userId,
@@ -852,41 +774,6 @@ class UserController extends Controller
         $filename = uniqid() . '_' . $file->getClientOriginalName();
         $path = $file->storeAs('uploads/' . $folder, $filename, $disk);
         return Storage::disk($disk)->url($path);
-    }
-
-    public function eventTicket($eventId)
-    {
-        try {
-            // Get event data
-            $event = Event::with('tickets')->find($eventId);
-
-            if (!$event) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Event not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'status' => true,
-                'event' => [
-                    'id' => $event->id,
-                    'name' => $event->name,
-                ],
-                'tickets' => $event->tickets->map(function ($ticket) {
-                    return [
-                        'id' => $ticket->id,
-                        'name' => $ticket->name,
-                    ];
-                })
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Something went wrong',
-                'error' => $e->getMessage()
-            ], 500);
-        }
     }
 
 
@@ -954,6 +841,9 @@ class UserController extends Controller
             $user = User::find($request->user_id);
             if ($user) {
                 $user->approval_status = $status;
+                if ($status == 1) {
+                    $user->order_id = $this->generateRandomCode(); // Add order_id if approved
+                }
                 $user->save();
             }
 
@@ -968,13 +858,95 @@ class UserController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Approval history saved successfully.',
-                'data' => $approval
-            ],200);
+                'data' => $approval,
+                'user' => $user->only(['id', 'name', 'email', 'number', 'approval_status', 'order_id'])
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
                 'message' => 'Failed to save approval history.',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getImage(Request $request)
+    {
+        try {
+            $userId = $request->id;
+
+            $user = User::find($userId);
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User not found.'
+                ], 404);
+            }
+    
+            $reportingUserId = $user->reporting_user;
+            $company = Company::where('user_id', $reportingUserId)->first();
+            $category = null;
+            if ($company->category_id) {
+                $category = Category::find($company->category_id);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'category saved successfully.',
+                'data' => $category,
+                'order_id' => $user->order_id ?? null,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to save category.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function imagesRetrive(Request $request)
+    {
+      
+        $fullImagePath = $request->input('path');
+      
+        if (!$fullImagePath) {
+            return response()->json(['error' => 'No image path provided'], 400);
+        }
+        $parsedUrl = parse_url($fullImagePath);
+        if (isset($parsedUrl['host']) && $parsedUrl['host'] === parse_url(url('/'), PHP_URL_HOST)) {
+            $relativePath = $parsedUrl['path'];
+        } elseif (str_starts_with($fullImagePath, url('/'))) {
+
+            $relativePath = str_replace(url('/'), '', $fullImagePath);
+        } else {
+            $relativePath = $fullImagePath;
+        }
+
+        $relativePath = urldecode(ltrim($relativePath, '/'));
+
+        $absolutePath = public_path(ltrim($relativePath, '/'));
+
+        if (!file_exists($absolutePath)) {
+            return response()->json([
+                'error' => 'Image not found',
+                'path' => $absolutePath,
+                'original_path' => $fullImagePath
+            ], 404);
+        }
+
+        try {
+            $fileContents = file_get_contents($absolutePath);
+            $mimeType = mime_content_type($absolutePath);
+
+            return response($fileContents, 200)
+                ->header('Content-Type', $mimeType);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to retrieve image',
+                'message' => $e->getMessage(),
+                'path' => $absolutePath
             ], 500);
         }
     }
@@ -987,7 +959,7 @@ class UserController extends Controller
             if ($request->hasFile('card_url')) {
                 $file = $request->file('card_url');
                 if ($file->isValid()) {
-                    $folder = 'card_url/' . str_replace(' ', '_', $request->name);
+                    $folder = 'CardUrl/' . str_replace(' ', '_', $request->name);
                     $filePath = $this->storeFile($file, $folder);
                 }
             }
@@ -995,12 +967,12 @@ class UserController extends Controller
                 ['user_id' => $request->user_id],
                 ['card_url' => $filePath]
             );
-        
+
             return response()->json([
                 'status' => true,
                 'message' => 'User card saved successfully.',
                 'data' => $userCard
-            ],200);
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -1009,4 +981,135 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    public function scannerHistory(Request $request)
+    {
+        try {
+           
+            $scanHistory = new ScanHistory();
+            $scanHistory->user_id = $request->user_id;
+            $scanHistory->scan_time = $request->scan_time;
+            $scanHistory->scanner_id = $request->scanner_id;
+         
+            $scanHistory->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'scan history saved successfully.',
+                'data' => $scanHistory
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to save scan history.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function generateRandomCode($length = 8)
+    {
+        $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$*';
+        $charactersLength = strlen($characters);
+        $randomString = '';
+        for ($i = 0; $i < $length; $i++) {
+            $randomString .= $characters[rand(0, $charactersLength - 1)];
+        }
+        return $randomString;
+    }
+
+    public function verifyCard(Request $request, $orderId)
+    {
+        try {
+            $loggedInUser = Auth::user();
+    
+            $user = User::where('order_id', $orderId)
+                ->with([
+                    'roles',
+                    'reportingUser.roles',
+                    'reportingUser.reportingUser.roles'
+                ])
+                ->first();
+    
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User not found.'
+                ]);
+            }
+    
+            $roleName = $user->roles->pluck('name')->first();
+    
+            $result = [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'user_number' => $user->number,
+                'role' => $roleName,
+            ];
+    
+            if ($roleName === 'Organizer') {
+                $result['organizer_data'] = [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'number' => $user->number,
+                    'photo' => $user->photo,
+                    'company' => $user->company_name,
+                ];
+            } elseif ($roleName === 'Company') {
+                $company = Company::where('user_id', $user->id)->first();
+    
+                $result['company_data'] = $company ? [
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'email' => $company->email,
+                    'number' => $company->number,
+                    'gst_no' => $company->gst_no,
+                    'company_letter' => $company->company_letter,
+                ] : null;
+            } elseif ($roleName === 'User') {
+                $companyUser = $user->reportingUser ?? null;
+                $organizerUser = $companyUser?->reportingUser ?? null;
+    
+                $result['company_user'] = $companyUser ? [
+                    'id' => $companyUser->id,
+                    'name' => $companyUser->name,
+                    'email' => $companyUser->email,
+                    'role' => $companyUser->roles->pluck('name')->first(),
+                    'company' => $companyUser->company ? [
+                        'id' => $companyUser->company->id,
+                        'company_name' => $companyUser->company->company_name,
+                        'gst_no' => $companyUser->company->gst_no,
+                    ] : null,
+                ] : null;
+    
+                $result['organizer_user'] = $organizerUser ? [
+                    'id' => $organizerUser->id,
+                    'name' => $organizerUser->name,
+                    'email' => $organizerUser->email,
+                    'role' => $organizerUser->roles->pluck('name')->first(),
+                    'company' => $organizerUser->organizerNew ? [
+                        'id' => $organizerUser->organizerNew->id,
+                        'company_name' => $organizerUser->organizerNew->company_name,
+                        'gst_no' => $organizerUser->organizerNew->gst_no,
+                    ] : null,
+                ] : null;
+            }
+    
+            return response()->json([
+                'status' => true,
+                'message' => 'Role-based data fetched successfully.',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    
+
 }

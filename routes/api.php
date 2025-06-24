@@ -84,27 +84,24 @@ Route::middleware(['restrict.ip'])->group(function () {
         // Route::post('user-approval/{id}', [UserController::class, 'approvalUrl']);
         Route::post('user-approval', [UserController::class, 'storeApprovalHistory']);
         Route::post('user-card', [UserController::class, 'storeUserCard']);
-        Route::get('fatch-company/{org_id}', [UserController::class, 'fatchCompany']);
+        Route::post('get-image/{id}', [UserController::class, 'getImage']);
+        Route::get('fetch-company/{org_id}', [UserController::class, 'fatchCompany']);
         Route::get('users/list', [UserController::class, 'indexlist']);
         Route::get('users-by-role/{role}', [UserController::class, 'getUsersByRole']);
         Route::delete('user-delete/{id}', [UserController::class, 'destroy']);
+        Route::post('get-image/retrive/data', [UserController::class, 'imagesRetrive']);
+        Route::post('scan-history', [UserController::class, 'scannerHistory']);
+        Route::post('verify-card/{orderId}', [UserController::class, 'verifyCard']);
 
         Route::post('chek-email', [UserController::class, 'checkEmail']);
         Route::post('chek-number-email', [UserController::class, 'checkMobile']);
 
-        Route::get('low-credit-users/{id}', [UserController::class, 'lowBalanceUser']);
         Route::get('edit-user/{id}', [UserController::class, 'edit']);
         Route::get('chek-user/{id}', [UserController::class, 'CheckValidUser']);
         Route::post('chek-password', [UserController::class, 'checkPassword']);
         Route::post('update-security', [UserController::class, 'UpdateUserSecurity']);
         Route::post('update-user/{id}', [UserController::class, 'update']);
         Route::post('update-user-alert/{id}', [UserController::class, 'updateAlerts']);
-        Route::get('scanner-token-length/{id}', [UserController::class, 'getQrLength']);
-
-        Route::post('create-bulk-user', [UserController::class, 'createBulkUsers']);
-
-        //event-ticket
-        Route::get('event-ticket/{event_id}', [UserController::class, 'eventTicket']);
 
         // passwrord change after login
         Route::post('update-password/{id}', [AuthController::class, 'changePassword']);

@@ -36,6 +36,11 @@ class User extends Authenticatable
     {
         return $this->belongsTo(User::class, 'reporting_user');
     }
+ 
+    public function reportingUserLevel2()
+    {
+        return $this->reportingUser()->with('reportingUser');
+    }
     public function usersUnder()
     {
         return $this->hasMany(User::class, 'reporting_user');
@@ -56,6 +61,17 @@ class User extends Authenticatable
     public function company()
     {
         return $this->belongsTo(Company::class, 'id', 'user_id');
+    }
+
+    public function companyNew()
+    {
+        return $this->hasOne(Company::class, 'user_id', 'id');
+    }
+
+    public function organizerNew()
+    {
+        return $this->hasOne(User::class, 'id', 'reporting_user')
+                    ->with('reportingUser');
     }
 
     public function userCompanyName()
