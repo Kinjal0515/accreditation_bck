@@ -9,4 +9,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class SmsConfig extends Model
 {
     use HasFactory,SoftDeletes;
+    protected $fillable = [
+        'user_id',
+        'url',
+        'user_id',
+        'api_key',
+        'sender_id',
+        'status'
+    ];
 }

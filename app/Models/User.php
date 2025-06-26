@@ -49,13 +49,21 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Organizer::class, 'id', 'user_id');
     }
+    public function comp()
+    {
+        return $this->belongsTo(Company::class, 'comp_id', 'user_id');
+    }
+    public function orgId()
+    {
+        return $this->belongsTo(Organizer::class, 'org_id', 'user_id');
+    }
     public function userOrganisation()
     {
         return $this->belongsTo(Organizer::class, 'org_id', 'user_id');
     }
     public function userCompany()
     {
-        return $this->belongsTo(Company::class, 'comp_id');
+        return $this->belongsTo(Company::class,'comp_id' ,'user_id');
     }
 
     public function company()
@@ -83,8 +91,14 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Organizer::class, 'reporting_user', 'user_id');
     }
+
+    
     public function zoneData()
     {
         return $this->hasMany(Zone::class);
+    }
+    public function smsConfig()
+    {
+        return $this->hasMany(SmsConfig::class);
     }
 }

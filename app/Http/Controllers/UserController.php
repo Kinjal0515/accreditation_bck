@@ -80,35 +80,6 @@ class UserController extends Controller
         $loggedInUser = Auth::user();
         $eventType = $request->type;
 
-        // Determine date range
-        // if ($eventType === 'all') {
-        //     $startDate = null;
-        //     $endDate = null;
-        // } elseif ($request->has('date')) {
-        //     $dates = explode(',', $request->date);
-        //     if (count($dates) === 1 || ($dates[0] === $dates[1])) {
-        //         $startDate = Carbon::parse($dates[0])->startOfDay();
-        //         $endDate = Carbon::parse($dates[0])->endOfDay();
-        //     } elseif (count($dates) === 2) {
-        //         $startDate = Carbon::parse($dates[0])->startOfDay();
-        //         $endDate = Carbon::parse($dates[1])->endOfDay();
-        //     } else {
-        //         return response()->json(['status' => false, 'message' => 'Invalid date format'], 400);
-        //     }
-        // } else {
-        //     $startDate = Carbon::today()->startOfDay();
-        //     $endDate = Carbon::today()->endOfDay();
-        // }
-
-        // Base query
-        // if ($loggedInUser->hasRole('Admin')) {
-        //     $query = User::with(['roles', 'reportingUser']);
-        // } else {
-        //     $query = User::with(['roles', 'reportingUser'])
-        //         ->where('reporting_user', $loggedInUser->id);
-        // }
-
-
         if ($loggedInUser->hasRole('Admin')) {
             $query = User::with(['roles', 'reportingUser']);
         } elseif ($loggedInUser->hasRole('Organizer')) {
@@ -122,22 +93,30 @@ class UserController extends Controller
                 ->where('reporting_user', $loggedInUser->id);
         }
 
-
-
-
-        // Apply date filter only if not "all"
-        // if ($eventType !== 'all' && $startDate && $endDate) {
-        //     $query->whereBetween('created_at', [$startDate, $endDate]);
-        // }
+        if ($eventType) {
+            $query->whereHas('roles', function ($q) use ($eventType) {
+                $q->where('name', $eventType);
+            });
+        }
 
         $users = $query->latest()->get();
 
-
-
         $allUsers = $users->map(function ($user) {
-            $zoneIds = json_decode($user->zone, true);
+            // $compZoneIds = json_decode($user->comp->zone ?? '[]', true);
+            // $compZoneData = collect();
+            // if (is_array($compZoneIds) && count($compZoneIds) > 0) {
+            //     $compZoneData = Zone::whereIn('id', $compZoneIds)->get(['id', 'title']);
+            // }
 
-            $zoneIds = json_decode($user->zone, true);
+            $roleName = $user->roles->pluck('name')->first();
+            $company = null;
+            if ($roleName == 'Company') {
+                $company = $user->company ?? null;
+            } else {
+                $company = $user->comp ?? null;
+            }
+            // $company = $roleName === 'Company' ? $user->company : $user->comp;
+            $zoneIds = json_decode($company->zone ?? '[]', true);
 
             $zoneData = collect();
             if (is_array($zoneIds) && count($zoneIds) > 0) {
@@ -149,6 +128,7 @@ class UserController extends Controller
                 'contact' => $user->number,
                 'email' => $user->email,
                 'photo' => $user->photo,
+                'designation' => $user->designation,
                 'photo_id' => $user->photo_id,
                 'order_id' => $user->order_id,
                 'role_name' => $user->roles->pluck('name')->first(),
@@ -162,8 +142,11 @@ class UserController extends Controller
                 'organiser_name' => $user->reportingUser->name ?? null,
                 'organiser_company_name' => $user->company->company_name ?? null,
                 'user_company_name' => $user->userCompanyName->company_name ?? null,
+                'background_image' => $user->comp->categoryId->background_image ?? null,
                 // 'user_org_name' => $user->userOrgName->name ?? null,
+                // 'zoneData' => $user->comp->zone ?? null,
                 'zoneData' => $zoneData ?? null,
+                'company' => $company ?? null,
             ];
         });
 
@@ -193,6 +176,124 @@ class UserController extends Controller
             'organizers' => $org
         ]);
     }
+    // public function index(Request $request)
+    // {
+    //     $loggedInUser = Auth::user();
+    //     $eventType = $request->type;
+
+    //     // Determine date range
+    //     // if ($eventType === 'all') {
+    //     //     $startDate = null;
+    //     //     $endDate = null;
+    //     // } elseif ($request->has('date')) {
+    //     //     $dates = explode(',', $request->date);
+    //     //     if (count($dates) === 1 || ($dates[0] === $dates[1])) {
+    //     //         $startDate = Carbon::parse($dates[0])->startOfDay();
+    //     //         $endDate = Carbon::parse($dates[0])->endOfDay();
+    //     //     } elseif (count($dates) === 2) {
+    //     //         $startDate = Carbon::parse($dates[0])->startOfDay();
+    //     //         $endDate = Carbon::parse($dates[1])->endOfDay();
+    //     //     } else {
+    //     //         return response()->json(['status' => false, 'message' => 'Invalid date format'], 400);
+    //     //     }
+    //     // } else {
+    //     //     $startDate = Carbon::today()->startOfDay();
+    //     //     $endDate = Carbon::today()->endOfDay();
+    //     // }
+
+    //     // Base query
+    //     // if ($loggedInUser->hasRole('Admin')) {
+    //     //     $query = User::with(['roles', 'reportingUser']);
+    //     // } else {
+    //     //     $query = User::with(['roles', 'reportingUser'])
+    //     //         ->where('reporting_user', $loggedInUser->id);
+    //     // }
+
+
+    //     if ($loggedInUser->hasRole('Admin')) {
+    //         $query = User::with(['roles', 'reportingUser']);
+    //     } elseif ($loggedInUser->hasRole('Organizer')) {
+    //         $query = User::with(['roles', 'reportingUser'])
+    //             ->where(function ($q) use ($loggedInUser) {
+    //                 $q->where('reporting_user', $loggedInUser->id)
+    //                     ->orWhere('user_org_id', $loggedInUser->id);
+    //             });
+    //     } else {
+    //         $query = User::with(['roles', 'reportingUser'])
+    //             ->where('reporting_user', $loggedInUser->id);
+    //     }
+
+
+
+
+    //     // Apply date filter only if not "all"
+    //     // if ($eventType !== 'all' && $startDate && $endDate) {
+    //     //     $query->whereBetween('created_at', [$startDate, $endDate]);
+    //     // }
+
+    //     $users = $query->latest()->get();
+
+
+
+    //     $allUsers = $users->map(function ($user) {
+    //         $zoneIds = json_decode($user->zone, true);
+
+    //         $zoneIds = json_decode($user->zone, true);
+
+    //         $zoneData = collect();
+    //         if (is_array($zoneIds) && count($zoneIds) > 0) {
+    //             $zoneData = Zone::whereIn('id', $zoneIds)->get(['id', 'title']);
+    //         }
+    //         return [
+    //             'id' => $user->id,
+    //             'name' => $user->name,
+    //             'contact' => $user->number,
+    //             'email' => $user->email,
+    //             'photo' => $user->photo,
+    //             'photo_id' => $user->photo_id,
+    //             'order_id' => $user->order_id,
+    //             'role_name' => $user->roles->pluck('name')->first(),
+    //             'status' => $user->status,
+    //             'approval_status' => $user->approval_status,
+    //             'reporting_user' => $user->reportingUser ? $user->reportingUser->name : null,
+    //             'organisation' => $user->organisation,
+    //             'created_at' => $user->created_at,
+    //             'authentication' => $user->authentication,
+    //             'company_name' => $user->userCompany->company_name ?? null,
+    //             'organiser_name' => $user->reportingUser->name ?? null,
+    //             'organiser_company_name' => $user->company->company_name ?? null,
+    //             'user_company_name' => $user->userCompanyName->company_name ?? null,
+    //             // 'user_org_name' => $user->userOrgName->name ?? null,
+    //             'zoneData' => $zoneData ?? null,
+    //         ];
+    //     });
+
+    //     $organizers = User::role('Organizer')->get();
+    //     $formattedUsers = $users->map(function ($user) {
+    //         return [
+    //             'value' => $user->id,
+    //             'label' => $user->name,
+    //             'number' => $user->number,
+    //             'email' => $user->email,
+    //             'role_name' => $user->roles->pluck('name')->first(),
+    //         ];
+    //     });
+
+    //     $org = $organizers->map(function ($user) {
+    //         return [
+    //             'value' => $user->id,
+    //             'label' => $user->name,
+    //             'company_name' => $user->organisation->company_name ?? null,
+    //         ];
+    //     });
+
+    //     return response()->json([
+    //         'status' => true,
+    //         'users' => $formattedUsers,
+    //         'allData' => $allUsers,
+    //         'organizers' => $org
+    //     ]);
+    // }
 
     public function create(Request $request)
     {
@@ -225,29 +326,38 @@ class UserController extends Controller
             $user->name = $request->name;
             $user->email = $request->email ?? $request->number . '@gyt.co.in';
             $user->number = $request->number;
-            $user->comp_id = $request->comp_id;
-            $user->org_id = $request->org_id;
+            // $user->comp_id = $request->comp_id;
+            // $user->org_id = $request->org_id;
             $user->user_org_id = $request->user_org_id;
-            // $user->company_name = $request->company_name;
             $user->designation = $request->designation;
             $user->address = $request->address;
-            // $user->organisation = $request->organisation;
-            // $user->alt_number = $request->alt_number;
             $user->pincode = $request->pincode;
             $user->state = $request->state;
             $user->city = $request->city;
-            // $user->bank_name = $request->bank_name;
-            // $user->bank_number = $request->bank_number;
-            // $user->bank_ifsc = $request->bank_ifsc;
-            // $user->bank_branch = $request->bank_branch;
-            // $user->bank_micr = $request->bank_micr;
-            // $user->tax_number = $request->tax_number;
             $user->reporting_user = $request->reporting_user;
-            $user->authentication = $request->authentication ? 1 : 0;
-            // $user->agent_disc = $request->agent_disc;
+            $user->authentication = $request->authentication ? 0 : 1;
             $user->status = true;
             $user->approval_status = 0;
             $user->password = Hash::make($request->password);
+
+            $loggedInUser =  auth()->user();
+            $role = $request->user_role;
+
+            if ($role === 'Admin') {
+                $user->comp_id = $request->comp_id;
+                $user->org_id = $request->org_id;
+            } elseif ($role === 'Organizer') {
+                if ($loggedInUser->hasRole('Admin')) {
+                    $user->comp_id = null;
+                    $user->org_id = $loggedInUser->id;
+                } else {
+                    $user->comp_id = $request->comp_id;
+                    $user->org_id = $loggedInUser->id;
+                }
+            } elseif ($role === 'Company') {
+                $user->comp_id = $loggedInUser->id;
+                $user->org_id = $loggedInUser->org_id ?? null;
+            }
 
             if ($request->hasFile('photo')) {
                 $file = $request->file('photo');
@@ -310,14 +420,16 @@ class UserController extends Controller
             'company.category',
             'organisation',
             'userOrganisation',
+            'comp',
             'roles'
         ])->where('id', $id)->firstOrFail();
 
-        // Decode zones column
-        $zoneIds = json_decode($user->zone, true);
-
-        // Default empty collection
-        $zoneIds = json_decode($user->zone, true); // safely decode
+        $roleName = $user->roles->pluck('name')->first();
+        $company = null;
+        if ($roleName == 'Company') {
+            $company = $user->company ?? null;
+        }
+        $zoneIds = json_decode($company->zone ?? '[]', true);
 
         $zoneData = collect();
         if (is_array($zoneIds) && count($zoneIds) > 0) {
@@ -334,7 +446,9 @@ class UserController extends Controller
             'pincode' => $user->pincode,
             'user_org_id' => $user->user_org_id,
             'state' => $user->state,
-            'zones' => $zoneData, // zone id + name
+            'zones' => $zoneData  ?? null,
+            'organizer' => $user->orgId->name ?? null,
+            'company' => $user->orgId->compId->company_name ?? null,
             'city' => $user->city,
             'status' => $user->status,
             'photo' => $user->photo,
@@ -424,7 +538,7 @@ class UserController extends Controller
 
 
             if ($request->has('authentication')) {
-                $user->authentication = $request->authentication ? 1 : 0;
+                $user->authentication = $request->authentication ? 0 : 1;
             }
 
 
@@ -435,10 +549,10 @@ class UserController extends Controller
                 $user->approval_status = $request->approval_status;
             }
 
-            if ($request->has('zone')) {
-                $zones = is_array($request->zone) ? $request->zone : json_decode($request->zone, true);
-                $user->zone = json_encode($zones);
-            }
+            // if ($request->has('zone')) {
+            //     $zones = is_array($request->zone) ? $request->zone : json_decode($request->zone, true);
+            //     $user->zone = json_encode($zones);
+            // }
 
 
             if ($request->hasFile('photo')) {
@@ -487,6 +601,106 @@ class UserController extends Controller
             return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    // public function update(Request $request, string $id)
+    // {
+    //     try {
+    //         $user = User::findOrFail($id);
+    //         $loggedInUser = auth()->user();
+    //         $role = $request->user_role;
+
+    //         // ✅ Basic fields
+    //         $fields = [
+    //             'name', 'email', 'number', 'address', 'company_name',
+    //             'user_org_id', 'designation', 'reporting_user',
+    //             'pincode', 'state', 'city', 'status', 'approval_status'
+    //         ];
+
+    //         foreach ($fields as $field) {
+    //             if ($request->has($field)) {
+    //                 $user->$field = $request->$field;
+    //             }
+    //         }
+
+    //         // ✅ Password
+    //         if ($request->has('password')) {
+    //             $user->password = Hash::make($request->password);
+    //         }
+
+    //         // ✅ Authentication (convert to int properly)
+    //         if ($request->has('authentication')) {
+    //             $user->authentication = $request->authentication ? 0 : 1;
+    //         }
+
+    //         // ✅ comp_id and org_id logic like in create()
+    //         if ($role === 'Admin') {
+    //             $user->comp_id = $request->comp_id;
+    //             $user->org_id = $request->org_id;
+    //         } elseif ($role === 'Organizer') {
+    //             if ($loggedInUser->hasRole('Admin')) {
+    //                 $user->comp_id = null;
+    //                 $user->org_id = $loggedInUser->id;
+    //             } else {
+    //                 $user->comp_id = $request->comp_id;
+    //                 $user->org_id = $loggedInUser->id;
+    //             }
+    //         } elseif ($role === 'Company') {
+    //             $user->comp_id = $loggedInUser->id;
+    //             $user->org_id = $loggedInUser->org_id ?? null;
+    //         }
+
+    //         // ✅ Photo upload
+    //         if ($request->hasFile('photo')) {
+    //             $file = $request->file('photo');
+    //             if ($file->isValid()) {
+    //                 $folder = 'photo/' . str_replace(' ', '_', $user->name);
+    //                 $user->photo = $this->storeFile($file, $folder);
+    //             }
+    //         }
+
+    //         if ($request->hasFile('photoId')) {
+    //             $file = $request->file('photoId');
+    //             if ($file->isValid()) {
+    //                 $folder = 'photoId/' . str_replace(' ', '_', $user->name);
+    //                 $user->photo_id = $this->storeFile($file, $folder);
+    //             }
+    //         }
+
+    //         // ✅ Role assignment
+    //         if ($request->has('role_id') && $request->role_id) {
+    //             $newRole = Role::find($request->role_id);
+    //             if ($newRole) {
+    //                 $user->syncRoles([]);
+    //                 $user->assignRole($newRole);
+    //                 $role = $newRole; // for response
+    //             }
+    //         }
+
+    //         // ✅ Organizer or Company store methods
+    //         if ($request->role_name == 'Organizer') {
+    //             $this->OrganizerStore($request, $id);
+    //         }
+    //         if ($request->role_name == 'Company') {
+    //             $this->CompanyStore($request, $id);
+    //         }
+
+    //         $user->save();
+
+    //         return response()->json([
+    //             'status' => true,
+    //             'message' => 'User Updated Successfully',
+    //             'role' => $role,
+    //             'user' => $user
+    //         ], 200);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'status' => false,
+    //             'message' => 'Failed to update user',
+    //             'error' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
     public function CheckValidUser($id)
     {
         try {
@@ -729,12 +943,20 @@ class UserController extends Controller
     {
         try {
             $filePath = null;
+            $gstCertificate = null;
 
             if ($request->hasFile('companyLetter')) {
                 $file = $request->file('companyLetter');
                 if ($file->isValid()) {
                     $folder = 'company_letter/' . str_replace(' ', '_', $request->name);
                     $filePath = $this->storeFile($file, $folder);
+                }
+            }
+            if ($request->hasFile('gstCertificate')) {
+                $file = $request->file('gstCertificate');
+                if ($file->isValid()) {
+                    $folder = 'company/gstCertificate/' . str_replace(' ', '_', $request->name);
+                    $gstCertificate = $this->storeFile($file, $folder);
                 }
             }
 
@@ -744,16 +966,24 @@ class UserController extends Controller
                     'org_id'       => $request->reporting_user,
                 ],
                 [
-                    'user_id'       => $userId,
-                    'name'          => $request->name,
-                    'number'        => $request->number,
-                    'email'         => $request->email,
-                    'address'       => $request->address,
-                    'gst_no'        => $request->gst_no,
-                    'category_id'   => $request->category_id,
+                    'user_id'        => $userId,
+                    'name'           => $request->name,
+                    'number'         => $request->number,
+                    'email'          => $request->email,
+                    'address'        => $request->address,
+                    'gst_no'         => $request->gst_no,
+                    'gst_certificate' => $gstCertificate,
+                    'category_id'    => $request->category_id,
                     'company_letter' => $filePath,
                 ]
             );
+
+            // Handle zone update separately
+            if ($request->has('zone')) {
+                $zones = is_array($request->zone) ? $request->zone : json_decode($request->zone, true);
+                $created->zone = json_encode($zones);
+                $created->save();
+            }
 
             return response()->json([
                 'status' => true,
@@ -1114,5 +1344,70 @@ class UserController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function ChekIn($orderId)
+    {
+        $booking = User::where('order_id', $orderId)->first();
+
+        if (!$booking) {
+            return response()->json(['status' => false, 'message' => 'Booking not found'], 404);
+        }
+        $UserId = $booking->id;
+        $scannerId = auth()->id();
+        $now = now()->toDateTimeString();
+        $history = ScanHistory::where('user_id', $UserId)
+            ->where('scanner_id', $scannerId)
+            ->first();
+        if ($history) {
+            $times = json_decode($history->scan_time ?? '[]', true);
+
+            $times[] = $now;
+
+            $history->scan_time = json_encode($times);
+            $history->count = $history->count + 1;
+            $history->save();
+        } else {
+            $history = new ScanHistory();
+            $history->user_id = $UserId;
+            $history->scanner_id = $scannerId;
+            $history->scan_time = json_encode([$now]);
+            $history->count = 1;
+            $history->save();
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Scan history recorded',
+            'data' => $history
+        ], 200);
+    }
+
+    public function compData($compId)
+    {
+
+        $booking = User::where('reporting_user', $compId)->select('id', 'name', 'number', 'email', 'approval_status')->get();
+
+        if (!$booking) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No user found under this company.'
+            ], 404);
+        }
+
+        return response()->json(['status' => true, 'data' => $booking], 200);
+    }
+
+    public function cardStatus($id)
+    {
+        $user = User::where('id', $id)->first();
+        
+        if (!$user) {
+            return response()->json(['status' => false, 'message' => 'User not found'], 404);
+        }
+        $status = $user->card_status ?? 0;  
+        $status->save();
+
+        return response()->json(['status' => true, 'data' => $status], 200);
     }
 }

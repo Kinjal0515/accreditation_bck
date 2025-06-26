@@ -43,7 +43,7 @@ Route::middleware(['restrict.ip'])->group(function () {
     Route::get('/getAllData', [DashboardController::class, 'getAllData']);
 
 
-    Route::post('create-user', [UserController::class, 'create']);
+    // Route::post('create-user', [UserController::class, 'create']);
     Route::post('/send-email/{id}', [EmailTemplateController::class, 'send']);
 
     Route::get('wc-mdl-list', [PopUpController::class, 'index']);
@@ -80,6 +80,7 @@ Route::middleware(['restrict.ip'])->group(function () {
 
 
         //user route
+        Route::post('create-user', [UserController::class, 'create']);
         Route::get('users', [UserController::class, 'index']);
         // Route::post('user-approval/{id}', [UserController::class, 'approvalUrl']);
         Route::post('user-approval', [UserController::class, 'storeApprovalHistory']);
@@ -92,6 +93,9 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('get-image/retrive/data', [UserController::class, 'imagesRetrive']);
         Route::post('scan-history', [UserController::class, 'scannerHistory']);
         Route::post('verify-card/{orderId}', [UserController::class, 'verifyCard']);
+        Route::get('chek-in/{orderId}', [UserController::class, 'ChekIn']);
+        Route::get('company-users/{comp_id}', [UserController::class, 'compData']);
+        Route::get('card-status/{id}', [UserController::class, 'cardStatus']);
 
         Route::post('chek-email', [UserController::class, 'checkEmail']);
         Route::post('chek-number-email', [UserController::class, 'checkMobile']);

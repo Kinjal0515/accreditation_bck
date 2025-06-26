@@ -10,4 +10,9 @@ class Organizer extends Model
 {
     use HasFactory,SoftDeletes;
     protected $fillable = ['user_id','name', 'email', 'number', 'address', 'gst_no', 'gst_certificate','company_name','company_letter'];
+
+    public function compId()
+    {
+        return $this->belongsTo(Company::class, 'user_id', 'org_id');
+    }
 }

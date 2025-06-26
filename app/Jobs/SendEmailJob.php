@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use App\Mail\SendEmail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Mail;
 
 class SendEmailJob implements ShouldQueue
@@ -35,9 +36,21 @@ class SendEmailJob implements ShouldQueue
         // Mail::to($this->details['email'])->send($email);
 
         try {
+            Log::error('Email Job Failed', [
+              
+                'email' => $this->details['email'],
+                'title' => $this->details['title'],
+                'body' => $this->details['body']
+            ]);
             // Send email
             Mail::to($this->details['email'])->send(new SendEmail($this->details['title'], $this->details['body']));
         } catch (\Exception $e) {
+            Log::error('Email Job Failed', [
+                'error' => $e->getMessage(),
+                'email' => $this->details['email'],
+                'title' => $this->details['title'],
+                'body' => $this->details['body']
+            ]);
             DB::table('failed_jobs')->insert([
                 'connection' => config('queue.default'),
                 'queue' => 'default',
