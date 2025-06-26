@@ -84,7 +84,7 @@ Route::middleware(['restrict.ip'])->group(function () {
         // Route::post('user-approval/{id}', [UserController::class, 'approvalUrl']);
         Route::post('user-approval', [UserController::class, 'storeApprovalHistory']);
         Route::post('user-card', [UserController::class, 'storeUserCard']);
-        Route::post('get-image/{id}', [UserController::class, 'getImage']);
+        Route::get('get-image/{id}', [UserController::class, 'getImage']);
         Route::get('fetch-company/{org_id}', [UserController::class, 'fatchCompany']);
         Route::get('users/list', [UserController::class, 'indexlist']);
         Route::get('users-by-role/{role}', [UserController::class, 'getUsersByRole']);

@@ -870,10 +870,10 @@ class UserController extends Controller
         }
     }
 
-    public function getImage(Request $request)
+    public function getImage($id)
     {
         try {
-            $userId = $request->id;
+            $userId = $id;
 
             $user = User::find($userId);
 
@@ -883,34 +883,40 @@ class UserController extends Controller
                     'message' => 'User not found.'
                 ], 404);
             }
-    
-            $reportingUserId = $user->reporting_user;
-            $company = Company::where('user_id', $reportingUserId)->first();
-            $category = null;
-            if ($company->category_id) {
-                $category = Category::find($company->category_id);
-            }
 
-            return response()->json([
-                'status' => true,
-                'message' => 'category saved successfully.',
-                'data' => $category,
-                'order_id' => $user->order_id ?? null,
-            ], 200);
+            $reportingUserId = $user->comp_id;
+            $company = Company::findorFail($reportingUserId);
+            $category = null;
+            if ($company?->category_id) {
+                $category = Category::find($company->category_id);
+                $categoryImage = $category->background_image ?? null;
+                return response()->json([
+                    'status' => true,
+                    'data' => $categoryImage,
+                    'token' => $user->order_id,
+                ], 200);
+            } else {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Category not found for the company.',
+                    'data' => $company
+                ], 404);
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
                 'message' => 'Failed to save category.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
             ], 500);
         }
     }
 
     public function imagesRetrive(Request $request)
     {
-      
+
         $fullImagePath = $request->input('path');
-      
+
         if (!$fullImagePath) {
             return response()->json(['error' => 'No image path provided'], 400);
         }
@@ -985,12 +991,12 @@ class UserController extends Controller
     public function scannerHistory(Request $request)
     {
         try {
-           
+
             $scanHistory = new ScanHistory();
             $scanHistory->user_id = $request->user_id;
             $scanHistory->scan_time = $request->scan_time;
             $scanHistory->scanner_id = $request->scanner_id;
-         
+
             $scanHistory->save();
 
             return response()->json([
@@ -1022,7 +1028,7 @@ class UserController extends Controller
     {
         try {
             $loggedInUser = Auth::user();
-    
+
             $user = User::where('order_id', $orderId)
                 ->with([
                     'roles',
@@ -1030,16 +1036,16 @@ class UserController extends Controller
                     'reportingUser.reportingUser.roles'
                 ])
                 ->first();
-    
+
             if (!$user) {
                 return response()->json([
                     'status' => false,
                     'message' => 'User not found.'
                 ]);
             }
-    
+
             $roleName = $user->roles->pluck('name')->first();
-    
+
             $result = [
                 'user_id' => $user->id,
                 'user_name' => $user->name,
@@ -1047,7 +1053,7 @@ class UserController extends Controller
                 'user_number' => $user->number,
                 'role' => $roleName,
             ];
-    
+
             if ($roleName === 'Organizer') {
                 $result['organizer_data'] = [
                     'name' => $user->name,
@@ -1058,7 +1064,7 @@ class UserController extends Controller
                 ];
             } elseif ($roleName === 'Company') {
                 $company = Company::where('user_id', $user->id)->first();
-    
+
                 $result['company_data'] = $company ? [
                     'id' => $company->id,
                     'name' => $company->name,
@@ -1070,7 +1076,7 @@ class UserController extends Controller
             } elseif ($roleName === 'User') {
                 $companyUser = $user->reportingUser ?? null;
                 $organizerUser = $companyUser?->reportingUser ?? null;
-    
+
                 $result['company_user'] = $companyUser ? [
                     'id' => $companyUser->id,
                     'name' => $companyUser->name,
@@ -1082,7 +1088,7 @@ class UserController extends Controller
                         'gst_no' => $companyUser->company->gst_no,
                     ] : null,
                 ] : null;
-    
+
                 $result['organizer_user'] = $organizerUser ? [
                     'id' => $organizerUser->id,
                     'name' => $organizerUser->name,
@@ -1095,7 +1101,7 @@ class UserController extends Controller
                     ] : null,
                 ] : null;
             }
-    
+
             return response()->json([
                 'status' => true,
                 'message' => 'Role-based data fetched successfully.',
@@ -1109,7 +1115,4 @@ class UserController extends Controller
             ], 500);
         }
     }
-    
-    
-
 }
