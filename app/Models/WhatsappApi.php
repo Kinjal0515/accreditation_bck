@@ -9,4 +9,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class WhatsappApi extends Model
 {
     use HasFactory,SoftDeletes;
+    protected $fillable = [
+        'title',
+        'user_id',
+        'variables',
+        'url',
+    ];
+
+    protected $casts = [
+        'variables' => 'array', // Automatically handle JSON encoding/decoding
+    ];
 }

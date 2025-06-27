@@ -36,6 +36,10 @@ class User extends Authenticatable
     {
         return $this->belongsTo(User::class, 'reporting_user');
     }
+    public function eventName()
+    {
+        return $this->belongsTo(Organizer::class, 'email','email');
+    }
  
     public function reportingUserLevel2()
     {
@@ -100,5 +104,9 @@ class User extends Authenticatable
     public function smsConfig()
     {
         return $this->hasMany(SmsConfig::class);
+    }
+    public function whatsappConfig()
+    {
+        return $this->hasMany(WhatsappConfigurations::class);
     }
 }

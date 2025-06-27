@@ -6,12 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class WhatsappConfigurations extends Model
+class SystemVariable extends Model
 {
     use HasFactory,SoftDeletes;
-    protected $fillable = [
-        'user_id',
-        'api_key',
-
-    ];
+    protected $fillable = ['key', 'value'];
 }

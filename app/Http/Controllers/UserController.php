@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendUserNotificationJob;
 use App\Models\ApprovalHistory;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\Organizer;
 use App\Models\ScanHistory;
+use App\Models\SmsTemplate;
 use App\Models\User;
 use App\Models\UserCard;
+use App\Models\WhatsappApi;
 use App\Models\Zone;
 use Auth;
 use Carbon\Carbon;
@@ -20,7 +23,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\Http;
+use App\Services\SmsService;
+use App\Services\WhatsappService;
 
 class UserController extends Controller
 {
@@ -87,6 +92,12 @@ class UserController extends Controller
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('user_org_id', $loggedInUser->id);
+                });
+        } elseif ($loggedInUser->hasRole('Company')) {
+            $query = User::with(['roles', 'reportingUser'])
+                ->where(function ($q) use ($loggedInUser) {
+                    $q->where('reporting_user', $loggedInUser->id)
+                        ->orWhere('comp_id', $loggedInUser->id);
                 });
         } else {
             $query = User::with(['roles', 'reportingUser'])
@@ -335,7 +346,7 @@ class UserController extends Controller
             $user->state = $request->state;
             $user->city = $request->city;
             $user->reporting_user = $request->reporting_user;
-            $user->authentication = $request->authentication ? 0 : 1;
+            $user->authentication = $request->authentication ? 1 : 0;
             $user->status = true;
             $user->approval_status = 0;
             $user->password = Hash::make($request->password);
@@ -345,14 +356,14 @@ class UserController extends Controller
 
             if ($role === 'Admin') {
                 $user->comp_id = $request->comp_id;
-                $user->org_id = $request->org_id;
+                $user->org_id = $request->org_id === 'undefined' ? $request->reporting_user : $request->org_id;
             } elseif ($role === 'Organizer') {
                 if ($loggedInUser->hasRole('Admin')) {
                     $user->comp_id = null;
-                    $user->org_id = $loggedInUser->id;
+                    $user->org_id = $request->reporting_user;
                 } else {
-                    $user->comp_id = $request->comp_id;
-                    $user->org_id = $loggedInUser->id;
+                    $user->comp_id = $request->comp_id ?? null;
+                    $user->org_id = $request->reporting_user;
                 }
             } elseif ($role === 'Company') {
                 $user->comp_id = $loggedInUser->id;
@@ -471,6 +482,7 @@ class UserController extends Controller
             'reporting_user_id' => $user->reportingUser->id ?? null,
             'shop' => $user->shop ?? null,
             'reporting_user' => $user->reportingUser->name ?? 'Admin User',
+            'event_name' => $user->eventName->event_name ?? null,
             'authentication' => $user->authentication,
         ];
 
@@ -538,7 +550,7 @@ class UserController extends Controller
 
 
             if ($request->has('authentication')) {
-                $user->authentication = $request->authentication ? 0 : 1;
+                $user->authentication = $request->authentication ? 1 : 0;
             }
 
 
@@ -921,9 +933,22 @@ class UserController extends Controller
                     'address'         => $request->address,
                     'gst_no'          => $request->gst_no,
                     'company_name'    => $request->organisation,
+                    'event_name'    => $request->event_name,
                     'gst_certificate' => $filePath // this will be null if not uploaded
                 ]
             );
+
+            // Save event info related to organizer
+            Event::updateOrCreate(
+                [
+                    'organizer_id' => $organizerData->id,
+                    'event_name'   => $request->event_name
+                ],
+                [
+                    'org_id' => $userId ?? null
+                ]
+            );
+
 
             return response()->json([
                 'status' => true,
@@ -1006,38 +1031,6 @@ class UserController extends Controller
         return Storage::disk($disk)->url($path);
     }
 
-
-    public function approvalUrl(Request $request, $id)
-    {
-        try {
-            $status = $request->input('status');
-
-            $user = User::find($id);
-
-            if (!$user) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'User not found.'
-                ], 404);
-            }
-
-            $user->approval_status = $status;
-            $user->save();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'User status updated successfully.',
-                'data' => $user
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Something went wrong.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function fatchCompany($org_id)
     {
         try {
@@ -1063,10 +1056,10 @@ class UserController extends Controller
         }
     }
 
-    public function storeApprovalHistory(Request $request)
+    public function storeApprovalHistory(Request $request, SmsService $smsService, WhatsappService $whatsappService)
     {
         try {
-            $status = $request->status ? 1 : 0;
+            $status = $request->status;
 
             $user = User::find($request->user_id);
             if ($user) {
@@ -1084,6 +1077,29 @@ class UserController extends Controller
 
             $approval->description = $request->description;
             $approval->save();
+
+            //send whatsapp or sms
+            $buttonValue = UserCard::where('user_id', $request->user_id)->first();
+            $filename = $buttonValue ? basename($buttonValue->card_url) : null;
+
+            $whatsappTemplate = WhatsappApi::where('title', 'Acc Ready')->first();
+            $whatsappTemplateName = $whatsappTemplate->template_name ?? '';
+            if ($status == 1) {
+                $data = (object)[
+                    'name' => $user->name,
+                    'number' => $user->number,
+                    'company_number' => $user->comp->number,
+                    'event_name' => $user->userOrganisation->event_name,
+                    'button_value' => $filename,
+                    'templateName' => 'Company Register',
+                    'whatsappTemplateData' => $whatsappTemplateName,
+
+                ];
+
+                $response = $smsService->send($data);
+                $response = $whatsappService->send($data);
+                // return response()->json($response);
+            }
 
             return response()->json([
                 'status' => true,
@@ -1114,10 +1130,22 @@ class UserController extends Controller
                 ], 404);
             }
 
-            $reportingUserId = $user->comp_id;
-            $company = Company::findorFail($reportingUserId);
+            // $roleName = $user->roles->pluck('name')->first();
+            // $company = null;
+            // if ($roleName == 'Company') {
+            //     $company = $user->company ?? null;
+            // }
+            // $reportingUserId = $user->comp_id;
+            if ($user->comp_id) {
+
+                $reportingUserId = $user->comp_id;
+                $company = Company::where('user_id', $reportingUserId)->first();
+            } else {
+                $reportingUserId = $user->company;
+                $company = Company::findorFail($reportingUserId);
+            }
             $category = null;
-            if ($company?->category_id) {
+            if ($company && $company->category_id) {
                 $category = Category::find($company->category_id);
                 $categoryImage = $category->background_image ?? null;
                 return response()->json([
@@ -1192,8 +1220,8 @@ class UserController extends Controller
         try {
             $filePath = null;
 
-            if ($request->hasFile('card_url')) {
-                $file = $request->file('card_url');
+            if ($request->hasFile('card')) {
+                $file = $request->file('card');
                 if ($file->isValid()) {
                     $folder = 'CardUrl/' . str_replace(' ', '_', $request->name);
                     $filePath = $this->storeFile($file, $folder);
@@ -1383,10 +1411,15 @@ class UserController extends Controller
         ], 200);
     }
 
-    public function compData($compId)
+    public function compData($compId, $type)
     {
+        if ($type  == 'organizer') {
+            $booking = User::where('org_id', $compId)->with('roles')->select('id', 'name', 'number', 'email', 'approval_status')->get();
+        }
 
-        $booking = User::where('reporting_user', $compId)->select('id', 'name', 'number', 'email', 'approval_status')->get();
+        if ($type  == 'company') {
+            $booking = User::where('comp_id', $compId)->with('roles')->select('id', 'name', 'number', 'email', 'approval_status')->get();
+        }
 
         if (!$booking) {
             return response()->json([
@@ -1398,16 +1431,67 @@ class UserController extends Controller
         return response()->json(['status' => true, 'data' => $booking], 200);
     }
 
-    public function cardStatus($id)
+    public function cardStatus($id, $status, SmsService $smsService, WhatsappService $whatsappService)
     {
         $user = User::where('id', $id)->first();
-        
+
         if (!$user) {
             return response()->json(['status' => false, 'message' => 'User not found'], 404);
         }
-        $status = $user->card_status ?? 0;  
-        $status->save();
+        $user->card_status = $status ?? 0;
+        $user->save();
 
-        return response()->json(['status' => true, 'data' => $status], 200);
+        // $whatsappTemplate = WhatsappApi::where('title', 'Acc Ready')->first();
+        // $whatsappTemplateName = $whatsappTemplate->template_name ?? '';
+        // if ($status == 1) {
+        //     $data = (object)[
+        //         'name' => $user->name,
+        //         'number' => $user->number,
+        //         'event_name' => $user->userOrganisation->event_name,
+        //         'templateName' => 'Card Prepared',
+        //         'whatsappTemplateData' => $whatsappTemplateName,
+
+        //     ];
+
+        //     $response = $smsService->send($data);
+        //     $response = $whatsappService->send($data);
+        //     // return response()->json($response);
+        // }
+
+        return response()->json(['status' => true, 'data' => $user], 200);
+    }
+
+    public function bulkApproval(Request $request)
+    {
+        $ids = $request->input('ids'); // array of user IDs
+        $status = $request->input('status'); // status 1 or 2
+
+        if (!is_array($ids) || !$status) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid input. Provide user IDs and status.'
+            ], 400);
+        }
+
+        foreach ($ids as $id) {
+            $user = User::find($id);
+            if ($user) {
+                $user->approval_status = $status;
+
+                if ($status == 1) {
+                    $user->order_id = $this->generateRandomCode();
+                }
+
+                $user->save();
+                if ($status == 1) {
+                    dispatch(new SendUserNotificationJob($user));
+                }
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Bulk approval status updated successfully.'
+        ], 200);
     }
 }

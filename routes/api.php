@@ -13,6 +13,7 @@ use App\Http\Controllers\PopUpController;
 
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SmsController;
+use App\Http\Controllers\SystemVariableController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WhatsappConfigurationsController;
 use App\Http\Controllers\ZoneController;
@@ -94,8 +95,9 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('scan-history', [UserController::class, 'scannerHistory']);
         Route::post('verify-card/{orderId}', [UserController::class, 'verifyCard']);
         Route::get('chek-in/{orderId}', [UserController::class, 'ChekIn']);
-        Route::get('company-users/{comp_id}', [UserController::class, 'compData']);
-        Route::get('card-status/{id}', [UserController::class, 'cardStatus']);
+        Route::get('company-users/{comp_id}/{type}', [UserController::class, 'compData']);
+        Route::get('card-status/{id}/{status}', [UserController::class, 'cardStatus']);
+        Route::post('bulk-approval', [UserController::class, 'bulkApproval']);
 
         Route::post('chek-email', [UserController::class, 'checkEmail']);
         Route::post('chek-number-email', [UserController::class, 'checkMobile']);
@@ -134,6 +136,12 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('/sms-template-update/{id}', [SmsController::class, 'update']);
         Route::post('/send-sms', [SmsController::class, 'sendSms']);
 
+         // system veriable
+         Route::get('system-variables', [SystemVariableController::class, 'index']);
+         Route::post('system-variables-store', [SystemVariableController::class, 'store']);
+         Route::post('system-variables-update/{id}', [SystemVariableController::class, 'update']);
+         Route::delete('system-variables-destroy/{id}', [SystemVariableController::class, 'destroy']);
+         
         //CategoryController
         Route::get('/category-list/{user_id}', [CategoryController::class, 'index']);
         Route::get('/category', [CategoryController::class, 'listData']);

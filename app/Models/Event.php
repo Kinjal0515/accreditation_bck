@@ -6,12 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class WhatsappConfigurations extends Model
+class Event extends Model
 {
     use HasFactory,SoftDeletes;
-    protected $fillable = [
-        'user_id',
-        'api_key',
+    protected $fillable = ['organizer_id','event_name', 'org_id'];
 
-    ];
 }

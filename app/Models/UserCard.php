@@ -9,4 +9,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class UserCard extends Model
 {
     use HasFactory,SoftDeletes;
+    protected $fillable = ['user_id','card_url'];
+
 }
