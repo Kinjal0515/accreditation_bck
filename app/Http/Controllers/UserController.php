@@ -346,7 +346,7 @@ class UserController extends Controller
             $user->state = $request->state;
             $user->city = $request->city;
             $user->reporting_user = $request->reporting_user;
-            $user->authentication = $request->authentication ? 1 : 0;
+            $user->authentication = filter_var($request->authentication, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
             $user->status = true;
             $user->approval_status = 0;
             $user->password = Hash::make($request->password);
@@ -453,11 +453,15 @@ class UserController extends Controller
             'email' => $user->email,
             'number' => $user->number,
             'address' => $user->address,
+            'created_at' => $user->created_at,
+            'approval_status' => $user->approval_status,
             'designation' => $user->designation,
             'pincode' => $user->pincode,
             'user_org_id' => $user->user_org_id,
             'state' => $user->state,
             'zones' => $zoneData  ?? null,
+            'userCard' => $user->userCard->card_url ?? null,
+            'category_url' => $user->comp->categoryId->background_image ?? null,
             'organizer' => $user->orgId->name ?? null,
             'company' => $user->orgId->compId->company_name ?? null,
             'city' => $user->city,
@@ -469,6 +473,7 @@ class UserController extends Controller
             'user_org_id' => $user->userOrganisation->user_id ?? null,
             'user_comp' => $user->userCompany->company_name ?? null,
             'user_comp_id' => $user->userCompany->org_id ?? null,
+            'company' => $user->userCompany ?? null,
             'org_name' => $user->organisation->name ?? null,
             'org_gst_certificate' => $user->organisation->gst_certificate ?? null,
             'org_gst_no' => $user->organisation->gst_no ?? null,
@@ -550,8 +555,9 @@ class UserController extends Controller
 
 
             if ($request->has('authentication')) {
-                $user->authentication = $request->authentication ? 1 : 0;
+                $user->authentication = filter_var($request->authentication, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
             }
+
 
 
             if ($request->has('status')) {
@@ -1441,22 +1447,23 @@ class UserController extends Controller
         $user->card_status = $status ?? 0;
         $user->save();
 
-        // $whatsappTemplate = WhatsappApi::where('title', 'Acc Ready')->first();
-        // $whatsappTemplateName = $whatsappTemplate->template_name ?? '';
-        // if ($status == 1) {
-        //     $data = (object)[
-        //         'name' => $user->name,
-        //         'number' => $user->number,
-        //         'event_name' => $user->userOrganisation->event_name,
-        //         'templateName' => 'Card Prepared',
-        //         'whatsappTemplateData' => $whatsappTemplateName,
+        $whatsappTemplate = WhatsappApi::where('title', 'Prepare Card')->first();
+        $whatsappTemplateName = $whatsappTemplate->template_name ?? '';
+        if ($status == 1) {
+            $data = (object)[
+                'name' => $user->name,
+                'number' => $user->number,
+                'event_name' => $user->userOrganisation->event_name,
+                'company_number' => $user->comp->number,
+                'templateName' => 'Card Prepared',
+                'whatsappTemplateData' => $whatsappTemplateName,
 
-        //     ];
+            ];
 
-        //     $response = $smsService->send($data);
-        //     $response = $whatsappService->send($data);
-        //     // return response()->json($response);
-        // }
+            $response = $smsService->send($data);
+            $response = $whatsappService->send($data);
+            // return response()->json($response);
+        }
 
         return response()->json(['status' => true, 'data' => $user], 200);
     }
@@ -1493,5 +1500,36 @@ class UserController extends Controller
             'status' => true,
             'message' => 'Bulk approval status updated successfully.'
         ], 200);
+    }
+
+    public function ganerateCard($id)
+    {
+        $zone = Zone::select('id', 'title')->get()->toArray();
+        $user = User::with([
+            'comp:id,user_id,company_name,zone,category_id',
+            'comp.categoryId:id,background_image',
+        ])
+        ->where('order_id', $id)
+        ->select('id', 'name', 'email', 'number', 'photo', 'photo_id', 'designation', 'order_id', 'comp_id')
+        ->first();
+        
+        if (!$user) {
+            return response()->json(['status' => false, 'message' => 'User not found'], 404);
+        }
+        
+        // Convert to array
+        $userArray = $user->toArray();
+        
+        // Rename comp to company
+        $userArray['company'] = $userArray['comp'] ?? null;
+        unset($userArray['comp']);
+        $userArray['zone'] = $zone;
+
+
+        if (!$user) {
+            return response()->json(['status' => false, 'message' => 'User not found'], 404);
+        }
+
+        return response()->json(['status' => true, 'data' => $userArray], 200);
     }
 }

@@ -35,6 +35,7 @@ class WhatsappService
             $data->event_name ?? '',
             'sms for you',
             '2025-06-27 15:26:32',        
+            $data->company_number ?? '',
         ];
 
         // API Call

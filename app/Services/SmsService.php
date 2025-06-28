@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\SmsTemplate;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SmsService
 {
@@ -29,11 +30,14 @@ class SmsService
 
         // Step 2: Replace placeholders
         $finalMessage = str_replace(
-            [':C_Name', ':Company_Number',':Event_Name'],
+            [':C_Name', ':Company_Number',':Event_Name',':Event_Location',':Event_Time',':Event_DateTime '],
             [
                 $data->name ?? '',
                 $data->company_number ?? '',
-                $data->event_name ?? ''
+                $data->event_name ?? '',
+                'sms for you',
+                '15:26:32',
+                '2025-06-27 2025-08-01',
             ],
             $messages
         );
@@ -64,8 +68,9 @@ class SmsService
             'format'      => 'json',
             'template_id' => $templateID,
         ];
-
+        // Log::info('Sending sms Message', ['response' => $params]);
         $response = Http::get($otpApi, $params);
+        // Log::info('Sending sms Message', ['response' => $response->body()]);
 
         return $response->successful()
             ? ['message' => 'SMS sent successfully', 'url' => $otpApi . '?' . http_build_query($params)]

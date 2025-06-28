@@ -8,9 +8,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmailTemplateController;
 
 use App\Http\Controllers\MailController;
-
-use App\Http\Controllers\PopUpController;
-
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\SystemVariableController;
@@ -39,15 +36,13 @@ Route::middleware(['restrict.ip'])->group(function () {
     Route::post('login', [AuthController::class, 'verifyUserRequest']);
     Route::post('register', [AuthController::class, 'register']);
     Route::post('verify-Password', [AuthController::class, 'verifyPassword']);
-
-
     Route::get('/getAllData', [DashboardController::class, 'getAllData']);
+    Route::get('gan-card/{order_id}', [UserController::class, 'ganerateCard']);
+    Route::post('get-image/retrive/data', [UserController::class, 'imagesRetrive']);
 
 
     // Route::post('create-user', [UserController::class, 'create']);
     Route::post('/send-email/{id}', [EmailTemplateController::class, 'send']);
-
-    Route::get('wc-mdl-list', [PopUpController::class, 'index']);
 
     Route::middleware(['auth:api'])->group(function () {
         Route::get('verify-user-settion', [AuthController::class, 'verifyUserSession']);
@@ -83,7 +78,6 @@ Route::middleware(['restrict.ip'])->group(function () {
         //user route
         Route::post('create-user', [UserController::class, 'create']);
         Route::get('users', [UserController::class, 'index']);
-        // Route::post('user-approval/{id}', [UserController::class, 'approvalUrl']);
         Route::post('user-approval', [UserController::class, 'storeApprovalHistory']);
         Route::post('user-card', [UserController::class, 'storeUserCard']);
         Route::get('get-image/{id}', [UserController::class, 'getImage']);
@@ -91,13 +85,13 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::get('users/list', [UserController::class, 'indexlist']);
         Route::get('users-by-role/{role}', [UserController::class, 'getUsersByRole']);
         Route::delete('user-delete/{id}', [UserController::class, 'destroy']);
-        Route::post('get-image/retrive/data', [UserController::class, 'imagesRetrive']);
         Route::post('scan-history', [UserController::class, 'scannerHistory']);
         Route::post('verify-card/{orderId}', [UserController::class, 'verifyCard']);
         Route::get('chek-in/{orderId}', [UserController::class, 'ChekIn']);
         Route::get('company-users/{comp_id}/{type}', [UserController::class, 'compData']);
         Route::get('card-status/{id}/{status}', [UserController::class, 'cardStatus']);
         Route::post('bulk-approval', [UserController::class, 'bulkApproval']);
+      
 
         Route::post('chek-email', [UserController::class, 'checkEmail']);
         Route::post('chek-number-email', [UserController::class, 'checkMobile']);

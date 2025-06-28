@@ -40,6 +40,10 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Organizer::class, 'email','email');
     }
+    public function userCard()
+    {
+        return $this->belongsTo(UserCard::class,'id', 'user_id');
+    }
  
     public function reportingUserLevel2()
     {
