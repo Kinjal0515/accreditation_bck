@@ -1453,9 +1453,11 @@ class UserController extends Controller
             $data = (object)[
                 'name' => $user->name,
                 'number' => $user->number,
+                'order_id' => $user->order_id,
                 'event_name' => $user->userOrganisation->event_name,
                 'company_number' => $user->comp->number,
-                'templateName' => 'Card Prepared',
+                'templateName' => 'Id Card Delivered',
+                // 'templateName' => 'Card Prepared',
                 'whatsappTemplateData' => $whatsappTemplateName,
 
             ];
@@ -1532,4 +1534,43 @@ class UserController extends Controller
 
         return response()->json(['status' => true, 'data' => $userArray], 200);
     }
+
+    public function userDetails($orderId)
+    {
+        $user = User::with([
+            'roles:id,name',
+            'comp:id,user_id,company_name,number,email,category_id,name',
+            'comp.categoryId:id,background_image',
+        ])
+            ->where('order_id', $orderId)
+            ->select('id', 'name', 'email', 'number', 'photo', 'photo_id', 'status','approval_status','order_id','comp_id')
+            ->first();
+    
+        if (!$user) {
+            return response()->json(['status' => false, 'message' => 'User not found'], 404);
+        }
+    
+        // Custom response formatting
+        $data = [
+            'name'        => $user->name,
+            'number'      => $user->number,
+            'email'       => $user->email,
+            'photo'       => $user->photo,
+            'photo_id'    => $user->photo_id,
+            'status'      => $user->status,
+            'approval_status'      => $user->approval_status,
+            'user_role'   => $user->roles->pluck('name')->first(),
+            'company'     => [
+                'name'            => $user->comp->name ?? null,
+                'number'          => $user->comp->number ?? null,
+                'email'           => $user->comp->email ?? null,
+                'company_name'    => $user->comp->company_name ?? null,
+                'category_id'     => $user->comp->category_id ?? null,
+                'category_background_image'=> $user->comp->categoryId->background_image ?? null,
+            ],
+        ];
+    
+        return response()->json(['status' => true, 'data' => $data], 200);
+    }
+    
 }

@@ -36,13 +36,16 @@ class SendEmailJob implements ShouldQueue
         // Mail::to($this->details['email'])->send($email);
 
         try {
-            Log::error('Email Job Failed', [
+            // Log::error('Email Job Failed', [
               
-                'email' => $this->details['email'],
-                'title' => $this->details['title'],
-                'body' => $this->details['body']
-            ]);
+            //     'email' => $this->details['email'],
+            //     'title' => $this->details['title'],
+            //     'body' => $this->details['body']
+            // ]);
             // Send email
+            // Mail::to('booking@getyourticket.in')->send(
+            //     new SendEmail('Test Subject', '<p>This is a test email body.</p>')
+            // );
             Mail::to($this->details['email'])->send(new SendEmail($this->details['title'], $this->details['body']));
         } catch (\Exception $e) {
             Log::error('Email Job Failed', [

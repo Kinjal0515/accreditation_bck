@@ -39,7 +39,7 @@ Route::middleware(['restrict.ip'])->group(function () {
     Route::get('/getAllData', [DashboardController::class, 'getAllData']);
     Route::get('gan-card/{order_id}', [UserController::class, 'ganerateCard']);
     Route::post('get-image/retrive/data', [UserController::class, 'imagesRetrive']);
-
+    
 
     // Route::post('create-user', [UserController::class, 'create']);
     Route::post('/send-email/{id}', [EmailTemplateController::class, 'send']);
@@ -91,6 +91,7 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::get('company-users/{comp_id}/{type}', [UserController::class, 'compData']);
         Route::get('card-status/{id}/{status}', [UserController::class, 'cardStatus']);
         Route::post('bulk-approval', [UserController::class, 'bulkApproval']);
+        Route::get('user-details/{order_id}', [UserController::class, 'userDetails']);
       
 
         Route::post('chek-email', [UserController::class, 'checkEmail']);

@@ -28,9 +28,13 @@ class SmsService
         $templateID = $templateData->template_id;
         $messages = $templateData->content;
 
+        $orderId = $data->order_id ?? '';
+        $host = request()->getSchemeAndHttpHost();
+        $shortLink = 'http://192.168.172.1:3000/token/' . $orderId;
+
         // Step 2: Replace placeholders
         $finalMessage = str_replace(
-            [':C_Name', ':Company_Number',':Event_Name',':Event_Location',':Event_Time',':Event_DateTime '],
+            [':C_Name', ':Company_Number',':Event_Name',':Event_Location',':Event_Time',':Event_DateTime',':S_Link'],
             [
                 $data->name ?? '',
                 $data->company_number ?? '',
@@ -38,6 +42,8 @@ class SmsService
                 'sms for you',
                 '15:26:32',
                 '2025-06-27 2025-08-01',
+                $shortLink,
+
             ],
             $messages
         );
@@ -68,9 +74,9 @@ class SmsService
             'format'      => 'json',
             'template_id' => $templateID,
         ];
-        // Log::info('Sending sms Message', ['response' => $params]);
+        Log::info('Sending sms Message', ['response' => $params]);
         $response = Http::get($otpApi, $params);
-        // Log::info('Sending sms Message', ['response' => $response->body()]);
+        Log::info('Sending sms Message', ['response' => $response->body()]);
 
         return $response->successful()
             ? ['message' => 'SMS sent successfully', 'url' => $otpApi . '?' . http_build_query($params)]
