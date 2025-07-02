@@ -84,10 +84,18 @@ class UserController extends Controller
     {
         $loggedInUser = Auth::user();
         $eventType = $request->type;
+        // $eventType = $request->type;
+
 
         if ($loggedInUser->hasRole('Admin')) {
             $query = User::with(['roles', 'reportingUser']);
         } elseif ($loggedInUser->hasRole('Organizer')) {
+            $query = User::with(['roles', 'reportingUser'])
+                ->where(function ($q) use ($loggedInUser) {
+                    $q->where('reporting_user', $loggedInUser->id)
+                        ->orWhere('user_org_id', $loggedInUser->id);
+                });
+        } elseif ($loggedInUser->hasRole('Sub Organizer')) {
             $query = User::with(['roles', 'reportingUser'])
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
@@ -104,11 +112,20 @@ class UserController extends Controller
                 ->where('reporting_user', $loggedInUser->id);
         }
 
+        // if ($eventType) {
+        //     $query->whereHas('roles', function ($q) use ($eventType) {
+        //         $q->where('name', $eventType);
+        //     });
+        // }
+
         if ($eventType) {
-            $query->whereHas('roles', function ($q) use ($eventType) {
-                $q->where('name', $eventType);
+            $normalizedEventType = ucwords(str_replace('-', ' ', $eventType));
+
+            $query->whereHas('roles', function ($q) use ($normalizedEventType) {
+                $q->where('name', $normalizedEventType);
             });
         }
+
 
         $users = $query->latest()->get();
 
@@ -158,10 +175,12 @@ class UserController extends Controller
                 // 'zoneData' => $user->comp->zone ?? null,
                 'zoneData' => $zoneData ?? null,
                 'company' => $company ?? null,
+                'category_id' => $company->category_id ?? null,
             ];
         });
 
         $organizers = User::role('Organizer')->get();
+        $subOrganizers = User::role('Sub Organizer')->get();
         $formattedUsers = $users->map(function ($user) {
             return [
                 'value' => $user->id,
@@ -172,7 +191,58 @@ class UserController extends Controller
             ];
         });
 
+        $compID = $request->company_id;
+        $copmData = Company::find($compID);
+
+        $companyUser = $copmData->user_id ?? null;
+        $companyUserData = User::where('comp_id', $companyUser)->with(['roles', 'reportingUser'])->get();
+
+        $mappedCompanyUsers = $companyUserData->map(function ($user) {
+            $roleName = $user->roles->pluck('name')->first();
+            $company = $roleName == 'Company' ? $user->company ?? null : $user->comp ?? null;
+            $zoneIds = json_decode($company->zone ?? '[]', true);
+
+            $zoneData = collect();
+            if (is_array($zoneIds) && count($zoneIds) > 0) {
+                $zoneData = Zone::whereIn('id', $zoneIds)->get(['id', 'title']);
+            }
+
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'contact' => $user->number,
+                'email' => $user->email,
+                'photo' => $user->photo,
+                'designation' => $user->designation,
+                'photo_id' => $user->photo_id,
+                'order_id' => $user->order_id,
+                'role_name' => $roleName,
+                'status' => $user->status,
+                'approval_status' => $user->approval_status,
+                'reporting_user' => $user->reportingUser ? $user->reportingUser->name : null,
+                'organisation' => $user->organisation,
+                'created_at' => $user->created_at,
+                'authentication' => $user->authentication,
+                'company_name' => $user->userCompany->company_name ?? null,
+                'organiser_name' => $user->reportingUser->name ?? null,
+                'organiser_company_name' => $user->company->company_name ?? null,
+                'user_company_name' => $user->userCompanyName->company_name ?? null,
+                'background_image' => $user->comp->categoryId->background_image ?? null,
+                'zoneData' => $zoneData ?? null,
+                'company' => $company ?? null,
+                'category_id' => $company->category_id ?? null,
+            ];
+        });
+
+
         $org = $organizers->map(function ($user) {
+            return [
+                'value' => $user->id,
+                'label' => $user->name,
+                'company_name' => $user->organisation->company_name ?? null,
+            ];
+        });
+        $subOrg = $subOrganizers->map(function ($user) {
             return [
                 'value' => $user->id,
                 'label' => $user->name,
@@ -183,8 +253,9 @@ class UserController extends Controller
         return response()->json([
             'status' => true,
             'users' => $formattedUsers,
-            'allData' => $allUsers,
-            'organizers' => $org
+            'allData' => count($allUsers) > 0 ? $allUsers : $mappedCompanyUsers,
+            'organizers' => $org,
+            'subOrg' => $subOrg
         ]);
     }
     // public function index(Request $request)
@@ -1326,6 +1397,14 @@ class UserController extends Controller
                     'photo' => $user->photo,
                     'company' => $user->company_name,
                 ];
+            } elseif ($roleName === 'Sub Organizer') {
+                $result['sub-organizer_data'] = [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'number' => $user->number,
+                    'photo' => $user->photo,
+                    'company' => $user->company_name,
+                ];
             } elseif ($roleName === 'Company') {
                 $company = Company::where('user_id', $user->id)->first();
 
@@ -1423,6 +1502,10 @@ class UserController extends Controller
             $booking = User::where('org_id', $compId)->with('roles')->select('id', 'name', 'number', 'email', 'approval_status')->get();
         }
 
+        if ($type  == 'sub-organizer') {
+            $booking = User::where('org_id', $compId)->with('roles')->select('id', 'name', 'number', 'email', 'approval_status')->get();
+        }
+
         if ($type  == 'company') {
             $booking = User::where('comp_id', $compId)->with('roles')->select('id', 'name', 'number', 'email', 'approval_status')->get();
         }
@@ -1511,17 +1594,17 @@ class UserController extends Controller
             'comp:id,user_id,company_name,zone,category_id',
             'comp.categoryId:id,background_image',
         ])
-        ->where('order_id', $id)
-        ->select('id', 'name', 'email', 'number', 'photo', 'photo_id', 'designation', 'order_id', 'comp_id')
-        ->first();
-        
+            ->where('order_id', $id)
+            ->select('id', 'name', 'email', 'number', 'photo', 'photo_id', 'designation', 'order_id', 'comp_id')
+            ->first();
+
         if (!$user) {
             return response()->json(['status' => false, 'message' => 'User not found'], 404);
         }
-        
+
         // Convert to array
         $userArray = $user->toArray();
-        
+
         // Rename comp to company
         $userArray['company'] = $userArray['comp'] ?? null;
         unset($userArray['comp']);
@@ -1543,13 +1626,13 @@ class UserController extends Controller
             'comp.categoryId:id,background_image',
         ])
             ->where('order_id', $orderId)
-            ->select('id', 'name', 'email', 'number', 'photo', 'photo_id', 'status','approval_status','order_id','comp_id')
+            ->select('id', 'name', 'email', 'number', 'photo', 'photo_id', 'status', 'approval_status', 'order_id', 'comp_id')
             ->first();
-    
+
         if (!$user) {
             return response()->json(['status' => false, 'message' => 'User not found'], 404);
         }
-    
+
         // Custom response formatting
         $data = [
             'name'        => $user->name,
@@ -1566,11 +1649,38 @@ class UserController extends Controller
                 'email'           => $user->comp->email ?? null,
                 'company_name'    => $user->comp->company_name ?? null,
                 'category_id'     => $user->comp->category_id ?? null,
-                'category_background_image'=> $user->comp->categoryId->background_image ?? null,
+                'category_background_image' => $user->comp->categoryId->background_image ?? null,
             ],
         ];
-    
+
         return response()->json(['status' => true, 'data' => $data], 200);
     }
-    
+
+    public function subOrgCompanies($sub_org_id)
+    {
+
+        try {
+            $user = User::find($sub_org_id);
+            $orgData = $user->org_id;
+            $company = Company::where('org_id', $orgData)->select('id', 'company_name')->get();
+
+            if (!$company) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Company not found for the given organizer ID.'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $company
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error fetching company.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -92,6 +92,7 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::get('card-status/{id}/{status}', [UserController::class, 'cardStatus']);
         Route::post('bulk-approval', [UserController::class, 'bulkApproval']);
         Route::get('user-details/{order_id}', [UserController::class, 'userDetails']);
+        Route::get('companies/{sub_org_id}', [UserController::class, 'subOrgCompanies']);
       
 
         Route::post('chek-email', [UserController::class, 'checkEmail']);
@@ -144,6 +145,7 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('/category-update/{id}', [CategoryController::class, 'update']);
         Route::get('/category-show/{id}', [CategoryController::class, 'show']);
         Route::delete('/category-destroy/{id}', [CategoryController::class, 'destroy']);
+        Route::get('get-layout/{user_id}', [CategoryController::class, 'layoutList']);
 
         //ZoneController
         Route::get('/zone-list/{user_id}', [ZoneController::class, 'index']);

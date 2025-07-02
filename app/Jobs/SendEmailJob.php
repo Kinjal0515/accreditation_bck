@@ -52,7 +52,7 @@ class SendEmailJob implements ShouldQueue
                 'error' => $e->getMessage(),
                 'email' => $this->details['email'],
                 'title' => $this->details['title'],
-                'body' => $this->details['body']
+                // 'body' => $this->details['body']
             ]);
             DB::table('failed_jobs')->insert([
                 'connection' => config('queue.default'),
