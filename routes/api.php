@@ -9,9 +9,12 @@ use App\Http\Controllers\EmailTemplateController;
 
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\ScanController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\SystemVariableController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WelcomeModalController;
 use App\Http\Controllers\WhatsappConfigurationsController;
 use App\Http\Controllers\ZoneController;
 use Illuminate\Http\Request;
@@ -39,7 +42,7 @@ Route::middleware(['restrict.ip'])->group(function () {
     Route::get('/getAllData', [DashboardController::class, 'getAllData']);
     Route::get('gan-card/{order_id}', [UserController::class, 'ganerateCard']);
     Route::post('get-image/retrive/data', [UserController::class, 'imagesRetrive']);
-    
+    Route::get('settings', [SettingController::class, 'index']);
 
     // Route::post('create-user', [UserController::class, 'create']);
     Route::post('/send-email/{id}', [EmailTemplateController::class, 'send']);
@@ -84,10 +87,7 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::get('fetch-company/{org_id}', [UserController::class, 'fatchCompany']);
         Route::get('users/list', [UserController::class, 'indexlist']);
         Route::get('users-by-role/{role}', [UserController::class, 'getUsersByRole']);
-        Route::delete('user-delete/{id}', [UserController::class, 'destroy']);
-        Route::post('scan-history', [UserController::class, 'scannerHistory']);
-        Route::post('verify-card/{orderId}', [UserController::class, 'verifyCard']);
-        Route::get('chek-in/{orderId}', [UserController::class, 'ChekIn']);
+        Route::delete('user-delete/{id}', [UserController::class, 'destroy']);       
         Route::get('company-users/{comp_id}/{type}', [UserController::class, 'compData']);
         Route::get('card-status/{id}/{status}', [UserController::class, 'cardStatus']);
         Route::post('bulk-approval', [UserController::class, 'bulkApproval']);
@@ -117,7 +117,20 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('/store-templates', [EmailTemplateController::class, 'store']);
         Route::post('/update-templates', [EmailTemplateController::class, 'update']);
 
+        //scan routes
+        // Route::post('scan-history', [ScanController::class, 'scannerHistory']);
+        Route::post('verify-card/{orderId}', [ScanController::class, 'verifyCard']);
+        Route::get('chek-in/{orderId}', [ScanController::class, 'ChekIn']);
+        Route::get('scanned-reports', [ScanController::class, 'scannedReports']);
 
+        // settings route
+
+        Route::post('settings-store', [SettingController::class, 'storeSettings']);
+
+        // welcome modal
+        Route::get('welcome-modal', [WelcomeModalController::class, 'welcomeModal']);
+        Route::post('welcome-modal-store', [WelcomeModalController::class, 'storeWelcomeModal']);
+        Route::post('welcome-modals/update/{id}', [WelcomeModalController::class, 'update']);
 
         // alerts route
         Route::get('send-mail', [MailController::class, 'send']);

@@ -100,6 +100,16 @@ class User extends Authenticatable
         return $this->belongsTo(Organizer::class, 'reporting_user', 'user_id');
     }
 
+    public function companyy()
+    {
+        return $this->hasOne(Company::class, 'user_id');
+    }
+
+    public function organizer()
+    {
+        return $this->hasOne(Organizer::class, 'user_id');
+    }   
+
     
     public function zoneData()
     {

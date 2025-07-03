@@ -95,19 +95,30 @@ class UserController extends Controller
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('user_org_id', $loggedInUser->id);
                 });
-        } elseif ($loggedInUser->hasRole('Sub Organizer')) {
+        } 
+        elseif ($loggedInUser->hasRole('Sub Organizer')) {
             $query = User::with(['roles', 'reportingUser'])
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('user_org_id', $loggedInUser->id);
                 });
-        } elseif ($loggedInUser->hasRole('Company')) {
+        }
+         elseif ($loggedInUser->hasRole('Company')) {
             $query = User::with(['roles', 'reportingUser'])
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('comp_id', $loggedInUser->id);
                 });
-        } else {
+        }
+        elseif ($loggedInUser->hasRole('Scanner')) {
+            $query = User::with(['roles', 'reportingUser'])
+                ->where(function ($q) use ($loggedInUser) {
+                    $q->where('reporting_user', $loggedInUser->id)
+                        ->orWhere('user_org_id', $loggedInUser->id);
+                });
+        }
+
+         else {
             $query = User::with(['roles', 'reportingUser'])
                 ->where('reporting_user', $loggedInUser->id);
         }
@@ -408,8 +419,6 @@ class UserController extends Controller
             $user->name = $request->name;
             $user->email = $request->email ?? $request->number . '@gyt.co.in';
             $user->number = $request->number;
-            // $user->comp_id = $request->comp_id;
-            // $user->org_id = $request->org_id;
             $user->user_org_id = $request->user_org_id;
             $user->designation = $request->designation;
             $user->address = $request->address;
@@ -418,7 +427,7 @@ class UserController extends Controller
             $user->city = $request->city;
             $user->reporting_user = $request->reporting_user;
             $user->authentication = filter_var($request->authentication, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-            $user->status = true;
+            $user->status = false;
             $user->approval_status = 0;
             $user->password = Hash::make($request->password);
 
@@ -1323,31 +1332,6 @@ class UserController extends Controller
         }
     }
 
-    public function scannerHistory(Request $request)
-    {
-        try {
-
-            $scanHistory = new ScanHistory();
-            $scanHistory->user_id = $request->user_id;
-            $scanHistory->scan_time = $request->scan_time;
-            $scanHistory->scanner_id = $request->scanner_id;
-
-            $scanHistory->save();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'scan history saved successfully.',
-                'data' => $scanHistory
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Failed to save scan history.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
     private function generateRandomCode($length = 8)
     {
         $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$*';
@@ -1359,142 +1343,6 @@ class UserController extends Controller
         return $randomString;
     }
 
-    public function verifyCard(Request $request, $orderId)
-    {
-        try {
-            $loggedInUser = Auth::user();
-
-            $user = User::where('order_id', $orderId)
-                ->with([
-                    'roles',
-                    'reportingUser.roles',
-                    'reportingUser.reportingUser.roles'
-                ])
-                ->first();
-
-            if (!$user) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'User not found.'
-                ]);
-            }
-
-            $roleName = $user->roles->pluck('name')->first();
-
-            $result = [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'user_email' => $user->email,
-                'user_number' => $user->number,
-                'role' => $roleName,
-            ];
-
-            if ($roleName === 'Organizer') {
-                $result['organizer_data'] = [
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'number' => $user->number,
-                    'photo' => $user->photo,
-                    'company' => $user->company_name,
-                ];
-            } elseif ($roleName === 'Sub Organizer') {
-                $result['sub-organizer_data'] = [
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'number' => $user->number,
-                    'photo' => $user->photo,
-                    'company' => $user->company_name,
-                ];
-            } elseif ($roleName === 'Company') {
-                $company = Company::where('user_id', $user->id)->first();
-
-                $result['company_data'] = $company ? [
-                    'id' => $company->id,
-                    'name' => $company->name,
-                    'email' => $company->email,
-                    'number' => $company->number,
-                    'gst_no' => $company->gst_no,
-                    'company_letter' => $company->company_letter,
-                ] : null;
-            } elseif ($roleName === 'User') {
-                $companyUser = $user->reportingUser ?? null;
-                $organizerUser = $companyUser?->reportingUser ?? null;
-
-                $result['company_user'] = $companyUser ? [
-                    'id' => $companyUser->id,
-                    'name' => $companyUser->name,
-                    'email' => $companyUser->email,
-                    'role' => $companyUser->roles->pluck('name')->first(),
-                    'company' => $companyUser->company ? [
-                        'id' => $companyUser->company->id,
-                        'company_name' => $companyUser->company->company_name,
-                        'gst_no' => $companyUser->company->gst_no,
-                    ] : null,
-                ] : null;
-
-                $result['organizer_user'] = $organizerUser ? [
-                    'id' => $organizerUser->id,
-                    'name' => $organizerUser->name,
-                    'email' => $organizerUser->email,
-                    'role' => $organizerUser->roles->pluck('name')->first(),
-                    'company' => $organizerUser->organizerNew ? [
-                        'id' => $organizerUser->organizerNew->id,
-                        'company_name' => $organizerUser->organizerNew->company_name,
-                        'gst_no' => $organizerUser->organizerNew->gst_no,
-                    ] : null,
-                ] : null;
-            }
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Role-based data fetched successfully.',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Something went wrong.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function ChekIn($orderId)
-    {
-        $booking = User::where('order_id', $orderId)->first();
-
-        if (!$booking) {
-            return response()->json(['status' => false, 'message' => 'Booking not found'], 404);
-        }
-        $UserId = $booking->id;
-        $scannerId = auth()->id();
-        $now = now()->toDateTimeString();
-        $history = ScanHistory::where('user_id', $UserId)
-            ->where('scanner_id', $scannerId)
-            ->first();
-        if ($history) {
-            $times = json_decode($history->scan_time ?? '[]', true);
-
-            $times[] = $now;
-
-            $history->scan_time = json_encode($times);
-            $history->count = $history->count + 1;
-            $history->save();
-        } else {
-            $history = new ScanHistory();
-            $history->user_id = $UserId;
-            $history->scanner_id = $scannerId;
-            $history->scan_time = json_encode([$now]);
-            $history->count = 1;
-            $history->save();
-        }
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Scan history recorded',
-            'data' => $history
-        ], 200);
-    }
 
     public function compData($compId, $type)
     {
