@@ -159,14 +159,7 @@ class CategoryController extends Controller
 
     public function layoutList($user_id)
     {
-        // $user = User::with('comp')->find($user_id);
-
-        // $categoryId = $user->comp->category_id ?? null;
-
-        // if (!$categoryId) {
-        //     return response()->json(['status' => false, 'message' => 'Category not found'], 404);
-        // }
-
+     
         $layout = CatLayout::where('category_id', $user_id)->first();
 
         return response()->json(['status' => true, 'data' => $layout], 200);

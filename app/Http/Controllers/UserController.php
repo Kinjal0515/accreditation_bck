@@ -84,8 +84,6 @@ class UserController extends Controller
     {
         $loggedInUser = Auth::user();
         $eventType = $request->type;
-        // $eventType = $request->type;
-
 
         if ($loggedInUser->hasRole('Admin')) {
             $query = User::with(['roles', 'reportingUser']);
@@ -95,30 +93,27 @@ class UserController extends Controller
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('user_org_id', $loggedInUser->id);
                 });
-        } 
-        elseif ($loggedInUser->hasRole('Sub Organizer')) {
+        } elseif ($loggedInUser->hasRole('Sub Organizer')) {
             $query = User::with(['roles', 'reportingUser'])
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('user_org_id', $loggedInUser->id);
                 });
-        }
-         elseif ($loggedInUser->hasRole('Company')) {
+        } elseif ($loggedInUser->hasRole('Company')) {
+
             $query = User::with(['roles', 'reportingUser'])
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('comp_id', $loggedInUser->id);
                 });
-        }
-        elseif ($loggedInUser->hasRole('Scanner')) {
+         
+        } elseif ($loggedInUser->hasRole('Scanner')) {
             $query = User::with(['roles', 'reportingUser'])
                 ->where(function ($q) use ($loggedInUser) {
                     $q->where('reporting_user', $loggedInUser->id)
                         ->orWhere('user_org_id', $loggedInUser->id);
                 });
-        }
-
-         else {
+        } else {
             $query = User::with(['roles', 'reportingUser'])
                 ->where('reporting_user', $loggedInUser->id);
         }
@@ -141,11 +136,6 @@ class UserController extends Controller
         $users = $query->latest()->get();
 
         $allUsers = $users->map(function ($user) {
-            // $compZoneIds = json_decode($user->comp->zone ?? '[]', true);
-            // $compZoneData = collect();
-            // if (is_array($compZoneIds) && count($compZoneIds) > 0) {
-            //     $compZoneData = Zone::whereIn('id', $compZoneIds)->get(['id', 'title']);
-            // }
 
             $roleName = $user->roles->pluck('name')->first();
             $company = null;
@@ -264,11 +254,13 @@ class UserController extends Controller
         return response()->json([
             'status' => true,
             'users' => $formattedUsers,
-            'allData' => count($allUsers) > 0 ? $allUsers : $mappedCompanyUsers,
+            'allData' => $allUsers->isNotEmpty() ? $allUsers : $mappedCompanyUsers->values(),
+            // 'allData' => count($allUsers) > 0 ? $allUsers : $mappedCompanyUsers,
             'organizers' => $org,
             'subOrg' => $subOrg
         ]);
     }
+
     // public function index(Request $request)
     // {
     //     $loggedInUser = Auth::user();
@@ -427,7 +419,7 @@ class UserController extends Controller
             $user->city = $request->city;
             $user->reporting_user = $request->reporting_user;
             $user->authentication = filter_var($request->authentication, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-            $user->status = false;
+            $user->status = true;
             $user->approval_status = 0;
             $user->password = Hash::make($request->password);
 

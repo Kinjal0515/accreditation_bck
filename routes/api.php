@@ -128,9 +128,11 @@ Route::middleware(['restrict.ip'])->group(function () {
         Route::post('settings-store', [SettingController::class, 'storeSettings']);
 
         // welcome modal
-        Route::get('welcome-modal', [WelcomeModalController::class, 'welcomeModal']);
+        Route::get('wc-mdl-list', [WelcomeModalController::class, 'welcomeModal']);
         Route::post('welcome-modal-store', [WelcomeModalController::class, 'storeWelcomeModal']);
-        Route::post('welcome-modals/update/{id}', [WelcomeModalController::class, 'update']);
+        Route::post('wc-mdl-update/{id}', [WelcomeModalController::class, 'update']);
+        Route::post('wc-mdl-status-update/{id}', [WelcomeModalController::class, 'statusUpdate']);
+        Route::delete('wc-mdl-delete/{id}', [WelcomeModalController::class, 'destroy']);
 
         // alerts route
         Route::get('send-mail', [MailController::class, 'send']);

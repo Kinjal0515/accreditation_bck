@@ -11,7 +11,7 @@ class WelcomeModalController extends Controller
 
     public function welcomeModal()
     {
-        $welcome = WelcomeModal::first();
+        $welcome = WelcomeModal::get();
         if (!$welcome) {
             return response()->json([
                 'status' => false,
@@ -35,12 +35,22 @@ class WelcomeModalController extends Controller
         $welcome->status = $request->status ?? 0;
 
         if ($request->hasFile('image')) {
-            $welcome->image_exc = $this->storeFile($request->file('image'), 'welcome_modals');
+            $file = $request->file('image');
+            if ($file->isValid()) {
+                $folder = 'welcome_modals' . str_replace(' ', '_', $request->name);
+                $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                $welcome->image_exc = $filePath;
+            }
+        }
+        if ($request->hasFile('sm_image')) {
+            $file = $request->file('sm_image');
+            if ($file->isValid()) {
+                $folder = 'welcome_modals' . str_replace(' ', '_', $request->name);
+                $filePath = $this->storeFile($file, $folder); // uses your storeFile method
+                $welcome->image_sm = $filePath;
+            }
         }
 
-        if ($request->hasFile('sm_image')) {
-            $welcome->image_sm = $this->storeFile($request->file('sm_image'), 'welcome_modals');
-        }
 
         $welcome->save();
 
@@ -54,7 +64,7 @@ class WelcomeModalController extends Controller
     public function update(Request $request, $id)
     {
         try {
-         
+
             $welcome = WelcomeModal::findOrFail($id);
 
             $welcome->title = $request->title ?? $welcome->title;
@@ -64,11 +74,20 @@ class WelcomeModalController extends Controller
             $welcome->status = $request->status ?? $welcome->status;
 
             if ($request->hasFile('image')) {
-                $welcome->image_exc = $this->storeFile($request->file('image'), 'welcome_modals');
+                $file = $request->file('image');
+                if ($file->isValid()) {
+                    $folder = 'welcome_modals' . str_replace(' ', '_', $request->name ?? 'welcome_modals');
+                    $filePath = $this->storeFile($file, $folder); // your custom file upload method
+                    $welcome->image_exc = $filePath;
+                }
             }
-
             if ($request->hasFile('sm_image')) {
-                $welcome->image_sm = $this->storeFile($request->file('sm_image'), 'welcome_modals');
+                $file = $request->file('sm_image');
+                if ($file->isValid()) {
+                    $folder = 'welcome_modals' . str_replace(' ', '_', $request->name ?? 'welcome_modals');
+                    $filePath = $this->storeFile($file, $folder); // your custom file upload method
+                    $welcome->image_sm = $filePath;
+                }
             }
 
             $welcome->save();
@@ -77,7 +96,7 @@ class WelcomeModalController extends Controller
                 'status' => true,
                 'message' => 'Welcome modal updated successfully!',
                 'data' => $welcome
-            ],200);
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -87,12 +106,46 @@ class WelcomeModalController extends Controller
         }
     }
 
-
-    private function storeFile($file, $folder)
+    public function statusUpdate(Request $request, $id)
     {
-        if (!$file) return null;
+        try {
+            $status = $request->input('status', 0);
+
+            WelcomeModal::where('id', '!=', $id)->update(['status' => 0]);
+
+            $modal = WelcomeModal::findOrFail($id);
+            $modal->status = $status;
+            $modal->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Welcome modal status updated successfully',
+                'data' => $modal,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to update status',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function storeFile($file, $folder, $disk = 'public')
+    {
         $filename = uniqid() . '_' . $file->getClientOriginalName();
-        $path = $file->storeAs('uploads/' . $folder, $filename, 'public');
-        return Storage::url($path);
+        $path = $file->storeAs('uploads/' . $folder, $filename, $disk);
+        return Storage::disk($disk)->url($path);
+    }
+
+    public function destroy(string $id)
+    {
+        $WelcomeModal = WelcomeModal::where('id', $id)->firstOrFail();
+        if (!$WelcomeModal) {
+            return response()->json(['status' => false, 'message' => 'WelcomeModal not found'], 404);
+        }
+
+        $WelcomeModal->delete();
+        return response()->json(['status' => true, 'message' => 'WelcomeModal deleted successfully'], 200);
     }
 }

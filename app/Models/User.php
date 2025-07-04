@@ -76,8 +76,13 @@ class User extends Authenticatable
 
     public function company()
     {
-        return $this->belongsTo(Company::class, 'id', 'user_id');
+        return $this->hasOne(Company::class, 'user_id', 'id');
     }
+
+    // public function company()
+    // {
+    //     return $this->belongsTo(Company::class, 'id', 'user_id');
+    // }
 
     public function companyNew()
     {
