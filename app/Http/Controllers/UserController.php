@@ -1166,10 +1166,11 @@ class UserController extends Controller
                 $data = (object)[
                     'name' => $user->name,
                     'number' => $user->number,
+                    'order_id' => $user->order_id,
                     'company_number' => $user->comp->number,
                     'event_name' => $user->userOrganisation->event_name,
                     'button_value' => $filename,
-                    'templateName' => 'Company Register',
+                    'templateName' => 'Id Card Delivered',
                     'whatsappTemplateData' => $whatsappTemplateName,
 
                 ];

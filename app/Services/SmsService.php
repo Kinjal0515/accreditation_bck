@@ -30,7 +30,7 @@ class SmsService
 
         $orderId = $data->order_id ?? '';
         $host = request()->getSchemeAndHttpHost();
-        $shortLink = 'http://192.168.172.1:3000/token/' . $orderId;
+        $shortLink = 'https://a.gyt.co.in/token/' . $orderId;
 
         // Step 2: Replace placeholders
         $finalMessage = str_replace(
